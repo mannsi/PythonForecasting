@@ -1,15 +1,8 @@
 import pandas as pd
 
 
-def by_week_sums(dates, values):
+def by(dates, qty, period):
     df = pd.DataFrame(index=dates)
-    df["qty"] = values
-    grouped_data = df.qty.resample('W').sum()
-    return grouped_data.index, grouped_data
-
-
-def by_month_sums(dates, values):
-    df = pd.DataFrame(index=dates)
-    df["qty"] = values
-    grouped_data = df.qty.resample('M').sum()
-    return grouped_data.index, grouped_data
+    df["qty"] = qty
+    grouped_qty = df.qty.resample(period).sum()
+    return grouped_qty.index, grouped_qty
