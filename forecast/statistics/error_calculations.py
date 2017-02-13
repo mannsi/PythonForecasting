@@ -25,7 +25,7 @@ def mape_error(list_of_sale_and_prediction_records: List[records.SaleAndPredicti
     :return: float with the mae error
     """
     # Filter out values where there is no prediction
-    filtered_records = [x for x in list_of_sale_and_prediction_records if x.predicted_qty is not None]
+    filtered_records = [x for x in list_of_sale_and_prediction_records if x.predicted_qty is not None and x.sale_qty != 0]
     all_percentage_errors = [float(100 * x.abs_error())/x.sale_qty for x in filtered_records]
     percentage_error_sum = sum(all_percentage_errors)
     mae = float(percentage_error_sum) / len(filtered_records)

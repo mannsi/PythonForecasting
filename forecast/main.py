@@ -12,6 +12,17 @@ def init_logging():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
+def drop_first_and_last_values_for_each_item(grouped_forecast_records):
+    updated_dict = {}
+    for item_id, item_records in grouped_forecast_records.items():
+        all_dates_for_item = [x.date for x in item_records]
+        item_records = [x for x in item_records if x.date != max(all_dates_for_item)]
+        item_records = [x for x in item_records if x.date != min(all_dates_for_item)]
+        updated_dict[item_id] = item_records
+
+    return updated_dict
+
+
 def get_forecast_and_sales_records(group_by):
     """
     Gets the tuple grouped_sales_records, grouped_forecast_records
@@ -28,6 +39,7 @@ def get_forecast_and_sales_records(group_by):
         forecast_file_abs_path = os.path.abspath(os.path.join("files", "forecast_values.txt"))
         forecast_records = file_reader.get_sample_forecast_values(forecast_file_abs_path)
         grouped_forecast_records = group_item_quantity_records(forecast_records, group_by)
+        grouped_forecast_records = drop_first_and_last_values_for_each_item(grouped_forecast_records)
         pickle.dump(grouped_forecast_records, open(forecast_value_pickle_file, "wb"))
 
         num_forecast_records = sum([len(item_records) for item_id, item_records in forecast_records.items()])
@@ -41,6 +53,7 @@ def get_forecast_and_sales_records(group_by):
         sales_file_abs_path = os.path.abspath(os.path.join("files", "histories_sales.txt"))
         sales_records = file_reader.get_sample_history_sales_values(sales_file_abs_path)
         grouped_sales_records = group_item_quantity_records(sales_records, group_by)
+        grouped_sales_records = drop_first_and_last_values_for_each_item(grouped_sales_records)
         pickle.dump(grouped_sales_records, open(sales_values_pickle_file, "wb"))
 
         num_sales_records = sum([len(item_records) for item_id, item_records in sales_records.items()])
@@ -72,8 +85,8 @@ def group_item_quantity_records(item_quantity_records, group_by):
     return grouped_item_quantity_dict
 
 
-def join_sales_and_forecasts(sales_records, forecast_records):
-    sale_and_predictions_pickle_file = "sale_and_predictions_list.p"
+def join_sales_and_forecasts(sales_records, forecast_records, period):
+    sale_and_predictions_pickle_file = period + "sale_and_predictions_list.pickle"
     try:
         sale_and_predictions_list = pickle.load(open(sale_and_predictions_pickle_file, "rb"))
         num_items = len(sale_and_predictions_list.distinct_item_ids())
@@ -107,18 +120,19 @@ def calculate_errors(sale_and_predictions_list: records.SaleAndPredictionRecordL
     """
     error_list = []
     item_ids = sale_and_predictions_list.distinct_item_ids()
+    logging.debug("Number of unique item ids found when calculating errors: {0}".format(len(item_ids)))
     for item_id in item_ids:
         records_for_item = sale_and_predictions_list.records_list_for_item(item_id)
 
         number_of_predictions = len([x for x in records_for_item if x.predicted_qty is not None])
         if number_of_predictions == 0:
             # Don't want to include none predicted items in statistics
-            break
+            logging.debug("No predictions for item with id {0}".format(item_id))
+            continue
 
         mae_error = error_calculations.mae_error(records_for_item)
-        # mape_error = error_calculations.mape_error(records_for_item)
-        # error_list.append((item_id, mae_error, mape_error))
-        error_list.append((item_id, mae_error))
+        mape_error = error_calculations.mape_error(records_for_item)
+        error_list.append((item_id, mae_error, mape_error))
     return error_list
 
 
@@ -128,30 +142,30 @@ def log_errors(error_list):
     :param error_list: List[(str, float, float). List containing the tuples (item_id, float_mae_error, float_mape_error)
     """
     logging.debug("=ERROR LOGGING")
-
     logging.debug("Number of error items {0}".format(len(error_list)))
-
-    # for error in error_list:
-    #     logging.debug("{0} \t  {1} \t {2}".format(error[0], error[1], error[2]))
-
     average_abs_error = float(sum([x[1] for x in error_list])) / len(error_list)
-    # average_percentage_error = float(sum([x[2] for x in error_list])) / len(error_list)
+    average_percentage_error = float(sum([x[2] for x in error_list])) / len(error_list)
+
+    error_list.sort(key=lambda record: record[2], reverse=True)
+    for error in error_list:
+        logging.debug("Item {0} had {1}% avg error and {2} abs avg error".format(error[0], error[2], error[1]))
 
     logging.debug("Average abs forecast error: {0}".format(average_abs_error))
-    # logging.debug("Average percentage forecast error: {0}".format(average_percentage_error))
+    logging.debug("Average percentage forecast error: {0}".format(average_percentage_error))
 
 
 def run():
+    period = 'M'
     init_logging()
-    sales_records, forecast_records = get_forecast_and_sales_records('W')
+    sales_records, forecast_records = get_forecast_and_sales_records(period)
     logging.debug("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_records)))
-    sale_and_predictions_list = join_sales_and_forecasts(sales_records, forecast_records)
+    sale_and_predictions_list = join_sales_and_forecasts(sales_records, forecast_records, period)
     error_list = calculate_errors(sale_and_predictions_list)
     log_errors(error_list)
 
     # TODO add my own forecast stuff and integrate with rest of the system
 
-    # show_graph(sale_and_predictions_list, sale_and_predictions_list.first_item_id())
+    show_graph(sale_and_predictions_list, '7792')
 
 
 run()
