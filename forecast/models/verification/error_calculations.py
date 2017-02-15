@@ -1,4 +1,4 @@
-import forecast.models.records as records
+import forecast.data_structures.records as records
 from typing import List
 
 

@@ -1,11 +1,12 @@
-import os
-import forecast.IO.file_reader as file_reader
-import forecast.graphs.quantitygraph as quantity_graph
-import forecast.models.records as records
-import forecast.data_manipulation.group as group
-import forecast.statistics.error_calculations as error_calculations
-import pickle
 import logging
+import os
+import pickle
+
+import forecast.IO.file_reader as file_reader
+import forecast.data_manipulation.group as group
+import forecast.data_structures.records as records
+import forecast.graphs.quantitygraph as quantity_graph
+import forecast.models.verification.error_calculations as error_calculations
 
 
 def init_logging():
@@ -109,7 +110,7 @@ def show_graph(sale_and_predictions_list, item_id):
     graph = quantity_graph.QuantityGraph(
         sales_dates,
         [(sales_quantities, "Sales"), (predicted_quantities, "AGR forecast")],
-        "Sales and predictions for item {0}".format(item_id))
+        "Sales and models for item {0}".format(item_id))
     graph.display_graph()
 
 
@@ -127,7 +128,7 @@ def calculate_errors(sale_and_predictions_list: records.SaleAndPredictionRecordL
         number_of_predictions = len([x for x in records_for_item if x.predicted_qty is not None])
         if number_of_predictions == 0:
             # Don't want to include none predicted items in statistics
-            logging.debug("No predictions for item with id {0}".format(item_id))
+            logging.debug("No models for item with id {0}".format(item_id))
             continue
 
         mae_error = error_calculations.mae_error(records_for_item)

@@ -1,6 +1,6 @@
 import csv
 import datetime
-from forecast.models.records import ItemDateQuantityRecord
+from forecast.data_structures.records import ItemDateQuantityRecord
 
 
 def get_sample_forecast_values(file_path):

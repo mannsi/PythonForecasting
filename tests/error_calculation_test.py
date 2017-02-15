@@ -1,6 +1,7 @@
 import unittest
-import forecast.statistics.error_calculations as error_calculations
-from forecast.models.records import SaleAndPredictionRecord
+
+import forecast.models.verification.error_calculations as error_calculations
+from forecast.data_structures.records import SaleAndPredictionRecord
 
 
 class ErrorCalculation(unittest.TestCase):
