@@ -7,6 +7,7 @@ import forecast.data_manipulation.group as group
 import forecast.data_structures.records as records
 import forecast.graphs.quantitygraph as quantity_graph
 import forecast.models.verification.error_calculations as error_calculations
+from forecast.data_manipulation.joined import SaleAndPredictions
 
 
 def init_logging():
@@ -95,7 +96,7 @@ def join_sales_and_forecasts(sales_records, forecast_records, period):
         logging.debug("Loading joined sales and prediction list from memory")
     except (OSError, IOError) as e:
         logging.debug("Starting to create joined record list")
-        sale_and_predictions_list = records.SaleAndPredictionRecordList(sales_records, forecast_records)
+        sale_and_predictions_list = SaleAndPredictions(sales_records, forecast_records)
         logging.debug("Finished making the list")
         pickle.dump(sale_and_predictions_list, open(sale_and_predictions_pickle_file, "wb"))
     return sale_and_predictions_list
@@ -114,27 +115,12 @@ def show_graph(sale_and_predictions_list, item_id):
     graph.display_graph()
 
 
-def calculate_errors(sale_and_predictions_list: records.SaleAndPredictionRecordList):
+def calculate_errors(sale_and_predictions_list: SaleAndPredictions):
     """
     Returns a list of tuples containing (item_id, float_mae_error, float_mape_error)
     :param sale_and_predictions_list:
     """
-    error_list = []
-    item_ids = sale_and_predictions_list.distinct_item_ids()
-    logging.debug("Number of unique item ids found when calculating errors: {0}".format(len(item_ids)))
-    for item_id in item_ids:
-        records_for_item = sale_and_predictions_list.records_list_for_item(item_id)
 
-        number_of_predictions = len([x for x in records_for_item if x.predicted_qty is not None])
-        if number_of_predictions == 0:
-            # Don't want to include none predicted items in statistics
-            logging.debug("No models for item with id {0}".format(item_id))
-            continue
-
-        mae_error = error_calculations.mae_error(records_for_item)
-        mape_error = error_calculations.mape_error(records_for_item)
-        error_list.append((item_id, mae_error, mape_error))
-    return error_list
 
 
 def log_errors(error_list):
