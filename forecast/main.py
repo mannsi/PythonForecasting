@@ -1,14 +1,15 @@
 import logging
 import os
 import pickle
+from typing import List
 
 import forecast.IO.file_reader as file_reader
-import forecast.data_manipulation.group as group
 import forecast.data_structures.records as records
 import forecast.graphs.quantitygraph as quantity_graph
-import forecast.models.verification.error_calculations as error_calculations
-from forecast.data_manipulation.joined import SaleAndPredictions
-
+import forecast.data_manipulation.group as group
+from forecast.models.agr.mock_model import MockModel
+from forecast.models.machine_learning.neural_network import NeuralNetwork
+from forecast.data_structures.records import ItemDateQuantityRecord
 
 def init_logging():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -77,7 +78,7 @@ def group_item_quantity_records(item_quantity_records, group_by):
         grouped_item_quantity_dict[item_id] = []
         dates = [x.date for x in item_records]
         quantities = [x.quantity for x in item_records]
-        grouped_dates, grouped_quantities = group.by(dates, quantities, group_by)
+        grouped_dates, grouped_quantities = group.group_by_dates(dates, quantities, group_by)
         for i in range(len(grouped_dates)):
             date = grouped_dates[i]
             quantity = grouped_quantities[i]
@@ -87,19 +88,16 @@ def group_item_quantity_records(item_quantity_records, group_by):
     return grouped_item_quantity_dict
 
 
-def join_sales_and_forecasts(sales_records, forecast_records, period):
+def join_sales_and_forecasts(sales_records: List[ItemDateQuantityRecord], forecast_records: List[ItemDateQuantityRecord], period):
     sale_and_predictions_pickle_file = period + "sale_and_predictions_list.pickle"
     try:
-        sale_and_predictions_list = pickle.load(open(sale_and_predictions_pickle_file, "rb"))
-        num_items = len(sale_and_predictions_list.distinct_item_ids())
-        logging.debug("Number of joined sales and prediction records {0}".format(num_items))
-        logging.debug("Loading joined sales and prediction list from memory")
+        sale_and_predictions_dict = pickle.load(open(sale_and_predictions_pickle_file, "rb"))
     except (OSError, IOError) as e:
         logging.debug("Starting to create joined record list")
-        sale_and_predictions_list = SaleAndPredictions(sales_records, forecast_records)
+        sale_and_predictions_dict = group.join_dicts(sales_records, forecast_records)
         logging.debug("Finished making the list")
-        pickle.dump(sale_and_predictions_list, open(sale_and_predictions_pickle_file, "wb"))
-    return sale_and_predictions_list
+        pickle.dump(sale_and_predictions_dict, open(sale_and_predictions_pickle_file, "wb"))
+    return sale_and_predictions_dict
 
 
 def show_graph(sale_and_predictions_list, item_id):
@@ -113,14 +111,6 @@ def show_graph(sale_and_predictions_list, item_id):
         [(sales_quantities, "Sales"), (predicted_quantities, "AGR forecast")],
         "Sales and models for item {0}".format(item_id))
     graph.display_graph()
-
-
-def calculate_errors(sale_and_predictions_list: SaleAndPredictions):
-    """
-    Returns a list of tuples containing (item_id, float_mae_error, float_mape_error)
-    :param sale_and_predictions_list:
-    """
-
 
 
 def log_errors(error_list):
@@ -144,13 +134,22 @@ def log_errors(error_list):
 def run():
     period = 'M'
     init_logging()
+
+    # Get the data from files and clean it
     sales_records, forecast_records = get_forecast_and_sales_records(period)
     logging.debug("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_records)))
-    sale_and_predictions_list = join_sales_and_forecasts(sales_records, forecast_records, period)
-    error_list = calculate_errors(sale_and_predictions_list)
-    log_errors(error_list)
+    sale_and_predictions_dict = join_sales_and_forecasts(sales_records, forecast_records, period)
 
-    # TODO add my own forecast stuff and integrate with rest of the system
+    for item_id, sales_prediction_records in sale_and_predictions_dict.items():
+        # TODO create a model for each item that I want. One agr model and one other model
+
+
+    agr_model = MockModel(sale_and_predictions_list)
+    agr_error_list = agr_model.test()
+    log_errors(agr_error_list)
+
+    my_model = NeuralNetwork()
+    my_model.train()
 
     show_graph(sale_and_predictions_list, '7792')
 

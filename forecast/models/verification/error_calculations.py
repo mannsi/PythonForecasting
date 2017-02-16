@@ -2,7 +2,7 @@ import forecast.data_structures.records as records
 from typing import List
 
 
-def mae_error(list_of_sale_and_prediction_records: List[records.SaleAndPredictionRecord]):
+def mae(list_of_sale_and_prediction_records: List[records.SaleAndPredictionRecord]):
     """
     Gets the mean absolute error from the list of records
 
@@ -17,7 +17,7 @@ def mae_error(list_of_sale_and_prediction_records: List[records.SaleAndPredictio
     return mae
 
 
-def mape_error(list_of_sale_and_prediction_records: List[records.SaleAndPredictionRecord]):
+def mape(list_of_sale_and_prediction_records: List[records.SaleAndPredictionRecord]):
     """
     Gets the mean absolute percentage error from the list of records
 
