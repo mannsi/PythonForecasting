@@ -12,8 +12,8 @@ class MockModel:
     def test(self):
         """
         Calculates the errors from the sales_and_prediction_list
-        :return: Tuple (item_id, float_mae_error, float_mape_error)
+        :return: Tuple (float_mae_error, float_mape_error)
         """
         mae_error = error_calculations.mae(self.sales_and_prediction_list)
         mape_error = error_calculations.mape(self.sales_and_prediction_list)
-        return self.item_id, mae_error, mape_error
+        return mae_error, mape_error

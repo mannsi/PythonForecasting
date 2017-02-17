@@ -15,7 +15,7 @@ def drop_first_and_last_values_for_each_item(grouped_forecast_records):
     return updated_dict
 
 
-def remove_nan_quantity_values(item_date_quantity_list: Dict[str,List[ItemDateQuantityRecord]]):
+def remove_nan_quantity_values(item_date_quantity_list: Dict[str, List[ItemDateQuantityRecord]]):
     """
     Takes a Dict[item_id, List[ItemDateQuantityRecord]] and returns the same data structure where only items with numeric quantities are kept
     """
@@ -28,18 +28,33 @@ def remove_nan_quantity_values(item_date_quantity_list: Dict[str,List[ItemDateQu
     return cleaned_dict
 
 
-def remove_items_with_no_predictions(sales_records:Dict[str,List[ItemDateQuantityRecord]], forecast_records:Dict[str,List[ItemDateQuantityRecord]]):
+def remove_items_with_no_predictions(sales_records: Dict[str, List[ItemDateQuantityRecord]],
+                                     forecast_records: Dict[str, List[ItemDateQuantityRecord]]):
     cleaned_item_sales_dict = {}
     cleaned_item_prediction_dict = {}
 
     for sales_item_id, item_sales_records in sales_records.items():
+        if sales_item_id == '8600':
+            a = 5
         if sales_item_id not in forecast_records:
             logging.WARNING("No prediction values found for item with id {0]".format(sales_item_id))
             continue
 
+        #  Verify that the item has at least one forecast value
         predicted_records_for_item = forecast_records[sales_item_id]
-        number_of_predictions_for_item = len([x for x in predicted_records_for_item if x.quantity is not None])
-        if number_of_predictions_for_item == 0:
+        item_has_some_forecasts = False
+        for sale_record in item_sales_records:
+            found_one_prediction = False
+            for predicted_record in predicted_records_for_item:
+                if predicted_record.date == sale_record.date:
+                    if not math.isnan(predicted_record.quantity):
+                        found_one_prediction = True
+                        break
+            if found_one_prediction:
+                item_has_some_forecasts = True
+                break
+
+        if not item_has_some_forecasts:
             logging.WARNING("No prediction values found for item with id {0]".format(sales_item_id))
             continue
 

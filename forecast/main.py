@@ -3,6 +3,7 @@ import os
 import pickle
 from typing import List
 import datetime
+import math
 
 import forecast.IO.file_reader as file_reader
 import forecast.data_structures.records as records
@@ -35,8 +36,8 @@ def get_forecast_and_sales_records(group_by):
     except (OSError, IOError) as e:
         forecast_file_abs_path = os.path.abspath(os.path.join("files", "forecast_values.txt"))
         forecast_records = file_reader.get_sample_forecast_values(forecast_file_abs_path)
-        forecast_records = clean.remove_nan_quantity_values(forecast_records)
         grouped_forecast_records = group_item_quantity_records(forecast_records, group_by)
+        grouped_forecast_records = clean.remove_nan_quantity_values(grouped_forecast_records)
         grouped_forecast_records = clean.drop_first_and_last_values_for_each_item(grouped_forecast_records)
         pickle.dump(grouped_forecast_records, open(forecast_value_pickle_file, "wb"))
 
@@ -50,8 +51,8 @@ def get_forecast_and_sales_records(group_by):
     except (OSError, IOError) as e:
         sales_file_abs_path = os.path.abspath(os.path.join("files", "histories_sales.txt"))
         sales_records = file_reader.get_sample_history_sales_values(sales_file_abs_path)
-        sales_records = clean.remove_nan_quantity_values(sales_records)
         grouped_sales_records = group_item_quantity_records(sales_records, group_by)
+        grouped_sales_records = clean.remove_nan_quantity_values(grouped_sales_records)
         grouped_sales_records = clean.drop_first_and_last_values_for_each_item(grouped_sales_records)
         pickle.dump(grouped_sales_records, open(sales_values_pickle_file, "wb"))
 
@@ -128,7 +129,7 @@ def log_errors(error_list, model_name):
 
 
 def run():
-    period = 'M'
+    period = 'W'
     init_logging(logging.INFO)
 
     # Get the data from files and clean it
@@ -143,7 +144,8 @@ def run():
     my_models_error_list = []
     for item_id, sales_prediction_records in sale_and_predictions_dict.items():
         agr_model = MockModel(item_id, sales_prediction_records)
-        agr_models_error_list.append(agr_model.test())
+        agr_mae, agr_mape = agr_model.test()
+        agr_models_error_list.append((item_id, agr_mae, agr_mape))
 
         sales_records_for_item = sales_records[item_id]
         training_data, test_data, test_data_answers = splitting.to_train_and_test_date_split(sales_records_for_item,
