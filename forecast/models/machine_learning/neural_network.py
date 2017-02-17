@@ -10,4 +10,4 @@ class NeuralNetwork:
         pass
 
     def predict(self, item_to_predict_quantity:ItemDateRecord) -> float:
-        return 0
+        return 100

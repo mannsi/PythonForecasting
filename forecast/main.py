@@ -16,8 +16,8 @@ from forecast.models.machine_learning.neural_network import NeuralNetwork
 from forecast.data_structures.records import ItemDateQuantityRecord
 
 
-def init_logging():
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+def init_logging(log_level):
+    logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def get_forecast_and_sales_records(group_by):
@@ -31,7 +31,7 @@ def get_forecast_and_sales_records(group_by):
 
     try:
         grouped_forecast_records = pickle.load(open(forecast_value_pickle_file, "rb"))
-        logging.debug("Loading forecast list from memory")
+        logging.info("Loading forecast list from memory")
     except (OSError, IOError) as e:
         forecast_file_abs_path = os.path.abspath(os.path.join("files", "forecast_values.txt"))
         forecast_records = file_reader.get_sample_forecast_values(forecast_file_abs_path)
@@ -41,12 +41,12 @@ def get_forecast_and_sales_records(group_by):
         pickle.dump(grouped_forecast_records, open(forecast_value_pickle_file, "wb"))
 
         num_forecast_records = sum([len(item_records) for item_id, item_records in forecast_records.items()])
-        logging.debug("Found {0} items with {1} number of forecast values and grouped them down to {2}"
+        logging.info("Found {0} items with {1} number of forecast values and grouped them down to {2}"
                       .format(len(forecast_records), num_forecast_records, len(grouped_forecast_records)))
 
     try:
         grouped_sales_records = pickle.load(open(sales_values_pickle_file, "rb"))
-        logging.debug("Loading sales list from memory")
+        logging.info("Loading sales list from memory")
     except (OSError, IOError) as e:
         sales_file_abs_path = os.path.abspath(os.path.join("files", "histories_sales.txt"))
         sales_records = file_reader.get_sample_history_sales_values(sales_file_abs_path)
@@ -56,7 +56,7 @@ def get_forecast_and_sales_records(group_by):
         pickle.dump(grouped_sales_records, open(sales_values_pickle_file, "wb"))
 
         num_sales_records = sum([len(item_records) for item_id, item_records in sales_records.items()])
-        logging.debug("Found {0} items with {1} number of sales values and grouped them down to {2}"
+        logging.info("Found {0} items with {1} number of sales values and grouped them down to {2}"
                       .format(len(sales_records), num_sales_records, len(grouped_sales_records)))
 
     return grouped_sales_records, grouped_forecast_records
@@ -90,9 +90,9 @@ def join_sales_and_forecasts(sales_records: List[ItemDateQuantityRecord],
     try:
         sale_and_predictions_dict = pickle.load(open(sale_and_predictions_pickle_file, "rb"))
     except (OSError, IOError) as e:
-        logging.debug("Starting to create joined record list")
+        logging.info("Starting to create joined record list")
         sale_and_predictions_dict = group.join_dicts(sales_records, forecast_records)
-        logging.debug("Finished making the list")
+        logging.info("Finished making the list")
         pickle.dump(sale_and_predictions_dict, open(sale_and_predictions_pickle_file, "wb"))
     return sale_and_predictions_dict
 
@@ -109,35 +109,34 @@ def show_graph(sale_and_predictions_list, item_id):
     graph.display_graph()
 
 
-def log_errors(error_list):
+def log_errors(error_list, model_name):
     """
     Log error values to current log output
     :param error_list: List[(str, float, float). List containing the tuples (item_id, float_mae_error, float_mape_error)
     """
-    logging.debug("=ERROR LOGGING")
-    logging.debug("Number of error items {0}".format(len(error_list)))
     average_abs_error = float(sum([x[1] for x in error_list])) / len(error_list)
     average_percentage_error = float(sum([x[2] for x in error_list])) / len(error_list)
 
     error_list.sort(key=lambda record: record[2], reverse=True)
+    logging.debug("Details for model {model}".format(model=model_name))
     for error in error_list:
         logging.debug("Item {0} had {1}% avg error and {2} abs avg error".format(error[0], error[2], error[1]))
 
-    logging.debug("Average abs forecast error: {0}".format(average_abs_error))
-    logging.debug("Average percentage forecast error: {0}".format(average_percentage_error))
+    logging.info("Log for model {model}=> Num error items: {num_items}, mae: {mae}, mape:{mape}"
+                 .format(num_items=len(error_list), mae=average_abs_error, mape=average_percentage_error, model=model_name))
 
 
 def run():
     period = 'M'
-    init_logging()
+    init_logging(logging.INFO)
 
     # Get the data from files and clean it
     sales_records, forecast_records = get_forecast_and_sales_records(period)
-    logging.debug("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_records)))
+    logging.info("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_records)))
     sales_records, forecast_records = clean.remove_items_with_no_predictions(sales_records, forecast_records)
-    logging.debug("Sales records: {0}, forecast records: {1} after cleaning".format(len(sales_records), len(forecast_records)))
+    logging.info("Sales records: {0}, forecast records: {1} after cleaning".format(len(sales_records), len(forecast_records)))
     sale_and_predictions_dict = join_sales_and_forecasts(sales_records, forecast_records, period)
-    logging.debug("Joined sales and forecast list has {0} items".format(len(sale_and_predictions_dict)))
+    logging.info("Joined sales and forecast list has {0} items".format(len(sale_and_predictions_dict)))
 
     agr_models_error_list = []
     my_models_error_list = []
@@ -158,7 +157,8 @@ def run():
 
         my_models_error_list.append((item_id, nn_mae, nn_mape))
 
-    log_errors(agr_models_error_list)
+    log_errors(agr_models_error_list, "AGR")
+    log_errors(my_models_error_list, "My NN")
 
     item_id_to_graph = '7792'
     show_graph(sale_and_predictions_dict[item_id_to_graph], item_id_to_graph)

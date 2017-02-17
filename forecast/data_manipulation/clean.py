@@ -34,13 +34,13 @@ def remove_items_with_no_predictions(sales_records:Dict[str,List[ItemDateQuantit
 
     for sales_item_id, item_sales_records in sales_records.items():
         if sales_item_id not in forecast_records:
-            logging.debug("No prediction values found for item with id {0]".format(sales_item_id))
+            logging.WARNING("No prediction values found for item with id {0]".format(sales_item_id))
             continue
 
         predicted_records_for_item = forecast_records[sales_item_id]
         number_of_predictions_for_item = len([x for x in predicted_records_for_item if x.quantity is not None])
         if number_of_predictions_for_item == 0:
-            logging.debug("No prediction values found for item with id {0]".format(sales_item_id))
+            logging.WARNING("No prediction values found for item with id {0]".format(sales_item_id))
             continue
 
         cleaned_item_sales_dict[sales_item_id] = item_sales_records
