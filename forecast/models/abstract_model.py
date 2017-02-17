@@ -6,5 +6,5 @@ class AbstractModel:
     def train(self, training_data: List[SaleAndPredictionRecord]):
         pass
 
-    def predict(self, item_to_predict_quantity:ItemDateRecord) -> float:
+    def predict(self, last_years_data) -> float:
         return 0

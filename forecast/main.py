@@ -129,6 +129,9 @@ def log_errors(error_list, model_name):
 
 
 def run():
+    # Start by evaluating predictions for 4 weeks, but have it as a parameter
+
+    # TODO output the std dev of the prediction stuff. Read and try to figure out
     period = 'W'
     init_logging(logging.INFO)
 
@@ -154,7 +157,7 @@ def run():
                                                                                                  day=6))
 
         logging.debug("Num training data: {0}, test data: {1}, test data answers: {2}". format(len(training_data), len(test_data), len(test_data_answers)))
-        nn = NeuralNetwork(item_id)
+        nn = NeuralNetwork(item_id, period)
         nn.train(training_data)
         nn_mae, nn_mape, nn_sales_prediction_records = model_accuracy.accuracy(nn, test_data, test_data_answers)
 
