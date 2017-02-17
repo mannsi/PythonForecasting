@@ -3,9 +3,8 @@ from forecast.data_structures.records import SaleAndPredictionRecord,ItemDateRec
 
 
 class NeuralNetwork:
-    def __init__(self):
-        # TODO set parameters here
-        pass
+    def __init__(self, item_id):
+        self.item_id = item_id
 
     def train(self, training_data: List[SaleAndPredictionRecord]):
         pass

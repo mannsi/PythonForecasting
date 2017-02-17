@@ -2,28 +2,22 @@ import logging
 import os
 import pickle
 from typing import List
+import datetime
 
 import forecast.IO.file_reader as file_reader
 import forecast.data_structures.records as records
 import forecast.graphs.quantitygraph as quantity_graph
 import forecast.data_manipulation.group as group
+import forecast.data_manipulation.splitting as splitting
+import forecast.models.verification.model_accuracy as model_accuracy
+import forecast.data_manipulation.clean as clean
 from forecast.models.agr.mock_model import MockModel
 from forecast.models.machine_learning.neural_network import NeuralNetwork
 from forecast.data_structures.records import ItemDateQuantityRecord
 
+
 def init_logging():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
-
-def drop_first_and_last_values_for_each_item(grouped_forecast_records):
-    updated_dict = {}
-    for item_id, item_records in grouped_forecast_records.items():
-        all_dates_for_item = [x.date for x in item_records]
-        item_records = [x for x in item_records if x.date != max(all_dates_for_item)]
-        item_records = [x for x in item_records if x.date != min(all_dates_for_item)]
-        updated_dict[item_id] = item_records
-
-    return updated_dict
 
 
 def get_forecast_and_sales_records(group_by):
@@ -41,8 +35,9 @@ def get_forecast_and_sales_records(group_by):
     except (OSError, IOError) as e:
         forecast_file_abs_path = os.path.abspath(os.path.join("files", "forecast_values.txt"))
         forecast_records = file_reader.get_sample_forecast_values(forecast_file_abs_path)
+        forecast_records = clean.remove_nan_quantity_values(forecast_records)
         grouped_forecast_records = group_item_quantity_records(forecast_records, group_by)
-        grouped_forecast_records = drop_first_and_last_values_for_each_item(grouped_forecast_records)
+        grouped_forecast_records = clean.drop_first_and_last_values_for_each_item(grouped_forecast_records)
         pickle.dump(grouped_forecast_records, open(forecast_value_pickle_file, "wb"))
 
         num_forecast_records = sum([len(item_records) for item_id, item_records in forecast_records.items()])
@@ -55,13 +50,14 @@ def get_forecast_and_sales_records(group_by):
     except (OSError, IOError) as e:
         sales_file_abs_path = os.path.abspath(os.path.join("files", "histories_sales.txt"))
         sales_records = file_reader.get_sample_history_sales_values(sales_file_abs_path)
+        sales_records = clean.remove_nan_quantity_values(sales_records)
         grouped_sales_records = group_item_quantity_records(sales_records, group_by)
-        grouped_sales_records = drop_first_and_last_values_for_each_item(grouped_sales_records)
+        grouped_sales_records = clean.drop_first_and_last_values_for_each_item(grouped_sales_records)
         pickle.dump(grouped_sales_records, open(sales_values_pickle_file, "wb"))
 
         num_sales_records = sum([len(item_records) for item_id, item_records in sales_records.items()])
         logging.debug("Found {0} items with {1} number of sales values and grouped them down to {2}"
-                      .format(len(sales_records), num_sales_records,len(grouped_sales_records)))
+                      .format(len(sales_records), num_sales_records, len(grouped_sales_records)))
 
     return grouped_sales_records, grouped_forecast_records
 
@@ -88,7 +84,8 @@ def group_item_quantity_records(item_quantity_records, group_by):
     return grouped_item_quantity_dict
 
 
-def join_sales_and_forecasts(sales_records: List[ItemDateQuantityRecord], forecast_records: List[ItemDateQuantityRecord], period):
+def join_sales_and_forecasts(sales_records: List[ItemDateQuantityRecord],
+                             forecast_records: List[ItemDateQuantityRecord], period):
     sale_and_predictions_pickle_file = period + "sale_and_predictions_list.pickle"
     try:
         sale_and_predictions_dict = pickle.load(open(sale_and_predictions_pickle_file, "rb"))
@@ -101,10 +98,9 @@ def join_sales_and_forecasts(sales_records: List[ItemDateQuantityRecord], foreca
 
 
 def show_graph(sale_and_predictions_list, item_id):
-    sale_and_prediction_list_for_item = sale_and_predictions_list.records_list_for_item(item_id)
-    sales_dates = [x.date for x in sale_and_prediction_list_for_item]
-    sales_quantities = [x.sale_qty for x in sale_and_prediction_list_for_item]
-    predicted_quantities = [x.predicted_qty for x in sale_and_prediction_list_for_item]
+    sales_dates = [x.date for x in sale_and_predictions_list]
+    sales_quantities = [x.sale_qty for x in sale_and_predictions_list]
+    predicted_quantities = [x.predicted_qty for x in sale_and_predictions_list]
 
     graph = quantity_graph.QuantityGraph(
         sales_dates,
@@ -138,20 +134,34 @@ def run():
     # Get the data from files and clean it
     sales_records, forecast_records = get_forecast_and_sales_records(period)
     logging.debug("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_records)))
+    sales_records, forecast_records = clean.remove_items_with_no_predictions(sales_records, forecast_records)
+    logging.debug("Sales records: {0}, forecast records: {1} after cleaning".format(len(sales_records), len(forecast_records)))
     sale_and_predictions_dict = join_sales_and_forecasts(sales_records, forecast_records, period)
+    logging.debug("Joined sales and forecast list has {0} items".format(len(sale_and_predictions_dict)))
 
+    agr_models_error_list = []
+    my_models_error_list = []
     for item_id, sales_prediction_records in sale_and_predictions_dict.items():
-        # TODO create a model for each item that I want. One agr model and one other model
+        agr_model = MockModel(item_id, sales_prediction_records)
+        agr_models_error_list.append(agr_model.test())
 
+        sales_records_for_item = sales_records[item_id]
+        training_data, test_data, test_data_answers = splitting.to_train_and_test_date_split(sales_records_for_item,
+                                                                                             datetime.datetime(
+                                                                                                 year=2016, month=2,
+                                                                                                 day=6))
 
-    agr_model = MockModel(sale_and_predictions_list)
-    agr_error_list = agr_model.test()
-    log_errors(agr_error_list)
+        logging.debug("Num training data: {0}, test data: {1}, test data answers: {2}". format(len(training_data), len(test_data), len(test_data_answers)))
+        nn = NeuralNetwork(item_id)
+        nn.train(training_data)
+        nn_mae, nn_mape, nn_sales_prediction_records = model_accuracy.accuracy(nn, test_data, test_data_answers)
 
-    my_model = NeuralNetwork()
-    my_model.train()
+        my_models_error_list.append((item_id, nn_mae, nn_mape))
 
-    show_graph(sale_and_predictions_list, '7792')
+    log_errors(agr_models_error_list)
+
+    item_id_to_graph = '7792'
+    show_graph(sale_and_predictions_dict[item_id_to_graph], item_id_to_graph)
 
 
 run()

@@ -1,6 +1,4 @@
 import math
-import logging
-from typing import List
 
 
 class ItemDateRecord:
@@ -14,9 +12,6 @@ class ItemDateQuantityRecord:
         self.quantity = quantity
         self.date = date
         self.item_id = item_id
-
-    def id(self):
-        return self.item_id + str(self.date)
 
 
 class SaleAndPredictionRecord:
