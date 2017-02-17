@@ -89,6 +89,7 @@ def join_sales_and_forecasts(sales_records: List[ItemDateQuantityRecord],
     sale_and_predictions_pickle_file = period + "sale_and_predictions_list.pickle"
     try:
         sale_and_predictions_dict = pickle.load(open(sale_and_predictions_pickle_file, "rb"))
+        logging.info("Loading joined sales and forecast list from memory")
     except (OSError, IOError) as e:
         logging.info("Starting to create joined record list")
         sale_and_predictions_dict = group.join_dicts(sales_records, forecast_records)
@@ -132,9 +133,9 @@ def run():
 
     # Get the data from files and clean it
     sales_records, forecast_records = get_forecast_and_sales_records(period)
-    logging.info("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_records)))
+    logging.debug("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_records)))
     sales_records, forecast_records = clean.remove_items_with_no_predictions(sales_records, forecast_records)
-    logging.info("Sales records: {0}, forecast records: {1} after cleaning".format(len(sales_records), len(forecast_records)))
+    logging.debug("Sales records: {0}, forecast records: {1} after cleaning".format(len(sales_records), len(forecast_records)))
     sale_and_predictions_dict = join_sales_and_forecasts(sales_records, forecast_records, period)
     logging.info("Joined sales and forecast list has {0} items".format(len(sale_and_predictions_dict)))
 
