@@ -6,9 +6,9 @@ import forecast.models.verification.error_calculations as error_calculations
 
 def accuracy(model: AbstractModel, test_data: List[ItemDateRecord], test_data_results: List[float]) -> (float, float, List[SaleAndPredictionRecord]):
     """
-    Calculates the mean absolute error and mean absolute percentage error for the given model and test data
+    Calculates the mean absolute error and mean absolute percentage error for the given neural_network_model and test data
 
-    :param model: The model to measure
+    :param model: The neural_network_model to measure
     :param test_data: The data to test on
     :param test_data_results: The true test data results
     :return: Tuple of (mae, mape, list_of_sale_prediction_records)
