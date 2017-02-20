@@ -30,7 +30,7 @@ class NeuralNetwork:
 
     def predict(self, last_years_data: List[ItemDateQuantityRecord]) -> float:
         if self.number_of_data_lag_values != len(last_years_data):
-            raise Exception("Expected {ex_num_values} number of values while predicting".format(ex_num_values = self.number_of_data_lag_value)
+            raise Exception("Expected {ex_num_values} number of values while predicting".format(ex_num_values = self.number_of_data_lag_value))
 
         # TODO create prediction using model
 
@@ -48,7 +48,7 @@ class NeuralNetwork:
 
         return True
 
-    def _get_training_tuples(self, training_data: List[ItemDateQuantityRecord]) -> List[(List,float)]:
+    def _get_training_tuples(self, training_data: List[ItemDateQuantityRecord]):
         """
         Takes all the training data and creates a list of tuples. Each tuple contains one training batch and
         the correct answer to that batch

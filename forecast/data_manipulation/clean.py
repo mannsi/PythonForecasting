@@ -34,8 +34,6 @@ def remove_items_with_no_predictions(sales_records: Dict[str, List[ItemDateQuant
     cleaned_item_prediction_dict = {}
 
     for sales_item_id, item_sales_records in sales_records.items():
-        if sales_item_id == '8600':
-            a = 5
         if sales_item_id not in forecast_records:
             logging.WARNING("No prediction values found for item with id {0]".format(sales_item_id))
             continue

@@ -30,3 +30,10 @@ def mape(list_of_sale_and_prediction_records: List[records.SaleAndPredictionReco
     percentage_error_sum = sum(all_percentage_errors)
     mae = float(percentage_error_sum) / len(filtered_records)
     return mae
+
+
+def percentage_error(record:records.SaleAndPredictionRecord):
+    if record.sale_qty == 0:
+        return None
+
+    return float(100 * record.abs_error())/record.sale_qty

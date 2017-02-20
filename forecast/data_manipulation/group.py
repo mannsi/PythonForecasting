@@ -24,13 +24,12 @@ def join_dicts(sales_record_dict, prediction_record_dict):
         predicted_records_for_item = prediction_record_dict[item_id]
 
         for sale_record in sale_records_for_item:
-            predicted_qty = None
             for predicted_record in predicted_records_for_item:
                 if predicted_record.date == sale_record.date:
-                    predicted_qty = predicted_record.quantity
+                    sale_and_predictions_list.append(
+                        SaleAndPredictionRecord(sale_record.item_id, sale_record.date, sale_record.quantity,
+                                                predicted_record.quantity))
                     break
-            sale_and_predictions_list.append(
-                SaleAndPredictionRecord(sale_record.item_id, sale_record.date, sale_record.quantity, predicted_qty))
 
         all_items_sales_and_predictions[item_id] = sale_and_predictions_list
     return all_items_sales_and_predictions
