@@ -5,20 +5,14 @@ from forecast.data_structures.records import ItemDateQuantityRecord, ItemDateRec
 
 def to_train_and_test_date_split(sales_prediction_records: List[ItemDateQuantityRecord], date_split: datetime):
     """
-    Creates training data, test data and test data answers from a sales prediction dataset
+    Creates train_data, test_data
     :param sales_prediction_records:
     :param date_split: the date that splits training and test data
-    :return: Tuple (training_data: List[SaleAndPredictionRecord], test_data: List[ItemDateRecord], test_data_answers:List[float])
+    :return: Tuple (List[ItemDateQuantityRecord], List[ItemDateQuantityRecord]) for train_data and test_data
     """
 
-    training_data = [x for x in sales_prediction_records if x.date < date_split]
-    uncleaned_test_data_list = [x for x in sales_prediction_records if date_split < x.date]
-    test_data = []
-    test_data_answers = []
+    train_data = [x for x in sales_prediction_records if x.date < date_split]
+    test_data = [x for x in sales_prediction_records if date_split < x.date]
 
-    for uncleaned_test_data in uncleaned_test_data_list:
-        test_data.append(ItemDateRecord(uncleaned_test_data.item_id, uncleaned_test_data.date))
-        test_data_answers.append(uncleaned_test_data.quantity)
-
-    return training_data, test_data, test_data_answers
+    return train_data, test_data
 

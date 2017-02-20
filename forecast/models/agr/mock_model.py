@@ -27,7 +27,7 @@ class MockModel:
             date = sale_and_prediction_record.date
             sale_qty = sale_and_prediction_record.sale_qty
             predicted_qty = sale_and_prediction_record.predicted_qty
-            percentage_error = error_calculations.percentage_error(sale_and_prediction_record)
+            percentage_error = error_calculations.percentage_error(sale_qty, predicted_qty)
             output_list.append(PredictionOutput(self.item_id, date, sale_qty, predicted_qty, percentage_error))
 
         return output_list

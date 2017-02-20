@@ -29,7 +29,7 @@ def create_dataset(dataset, look_back):
     return numpy.array(dataX), numpy.array(dataY)
 
 # reshape into X=t and Y=t+1
-look_back = 1
+look_back = 2
 trainX, trainY = create_dataset(train, look_back)
 testX, testY = create_dataset(test, look_back)
 

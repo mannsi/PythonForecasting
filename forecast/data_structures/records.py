@@ -21,7 +21,3 @@ class SaleAndPredictionRecord:
         self.sale_qty = sale_qty
         self.predicted_qty = predicted_qty
 
-    def abs_error(self):
-        return math.fabs(self.sale_qty - self.predicted_qty)
-
-

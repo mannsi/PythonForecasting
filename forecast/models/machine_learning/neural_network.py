@@ -1,65 +1,54 @@
+import numpy
+import math
 from typing import List
-from forecast.data_structures.records import ItemDateQuantityRecord,ItemDateRecord
+from forecast.models.abstract_model import AbstractModel
+from keras.models import Sequential
+from keras.layers import Dense
 
 
-class NeuralNetwork:
-    def __init__(self, item_id, data_periods:str):
+class NeuralNetwork(AbstractModel):
+    def __init__(self, item_id, num_hidden_layers: int, num_nodes_per_hidden_layer: int, num_input_nodes: int):
         """
 
         :param item_id:
         :param data_periods:
         """
-        # TODO create the NN
-        # self.nn =
+        self.neural_network_model = Sequential()
+        self.num_nodes_per_hidden_layer = num_nodes_per_hidden_layer
+        self.num_hidden_layers = num_hidden_layers
         self.item_id = item_id
-        if data_periods == 'W':
-            self.number_of_data_lag_values = 52
-        elif data_periods == 'M':
-            self.number_of_data_lag_values = 12
+        self.num_input_nodes = num_input_nodes
 
-    def train(self, training_data: List[ItemDateQuantityRecord]):
-        data_is_sorted = self._is_training_data_sorted(training_data)
-        if not data_is_sorted:
-            raise Exception("Training data for NN is not sorted by date !")
+    def train(self, training_data: List[float]):
+        if len(training_data) < self.num_input_nodes:
+            raise Exception("Not enough training data records to train. Need {need} but got {got}"
+                            .format(need=self.num_input_nodes, got=len(training_data)))
 
-        training_tuples = self._get_training_tuples(training_data)
+        train_x, train_y = self._create_training_dataset(training_data, self.num_input_nodes)
 
-        for nn_input_values, nn_output_answer in training_tuples:
-            # TODO create and train the NN
-            pass
+        # create and fit Multilayer Perceptron neural_network_model
 
-    def predict(self, last_years_data: List[ItemDateQuantityRecord]) -> float:
-        if self.number_of_data_lag_values != len(last_years_data):
-            raise Exception("Expected {ex_num_values} number of values while predicting".format(ex_num_values = self.number_of_data_lag_value))
+        for i in range(self.num_hidden_layers):
+            self.neural_network_model.add(
+                Dense(self.num_nodes_per_hidden_layer, input_dim=self.num_input_nodes, activation='relu'))
+        self.neural_network_model.add(Dense(1))
+        self.neural_network_model.compile(loss='mean_squared_error', optimizer='adam')
+        self.neural_network_model.fit(train_x, train_y, nb_epoch=200, batch_size=2, verbose=0)
+        train_score = self.neural_network_model.evaluate(train_x, train_y, verbose=0)
+        return math.sqrt(train_score)  # The train score is the mean squared error. Need to sqrt it to get the actual error.
 
-        # TODO create prediction using model
+    def predict(self, last_years_data: List[float]) -> float:
+        if self.num_input_nodes != len(last_years_data):
+            raise Exception("Expected {ex_num_values} number of values while predicting".format(ex_num_values=self.num_input_nodes))
 
-        return 100
+        prediction_input = numpy.array([last_years_data])
+        predicted_array = self.neural_network_model.predict(prediction_input)
+        return predicted_array[0]
 
-    def _is_training_data_sorted(self, training_data):
-        previous_date = None
-        for training_record in training_data:
-            if previous_date is None:
-                previous_date = training_record.date
-                continue
-
-            if training_record.date < previous_date:
-                return False
-
-        return True
-
-    def _get_training_tuples(self, training_data: List[ItemDateQuantityRecord]):
-        """
-        Takes all the training data and creates a list of tuples. Each tuple contains one training batch and
-        the correct answer to that batch
-        """
-        training_tuples_list = []
-        num_tuples = len(training_data) - self.number_of_data_lag_values - 1  # Can't use the last value since there is no ground truth there
-
-        if num_tuples < 1:
-            raise Exception("Too few training values to train. Only {0} values provided".format(len(training_data)))
-
-        for i in range(num_tuples):
-            training_records = training_data[i:i+self.number_of_data_lag_values]
-            correct_answer = training_data[i+self.number_of_data_lag_values + 1]
-            training_tuples_list.append((training_records, correct_answer))
+    def _create_training_dataset(self, dataset, look_back):
+        dataX, dataY = [], []
+        for i in range(len(dataset) - look_back - 1):
+            a = dataset[i:(i + look_back)]
+            dataX.append(a)
+            dataY.append(dataset[i + look_back])
+        return numpy.array(dataX), numpy.array(dataY)

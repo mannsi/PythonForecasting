@@ -3,6 +3,7 @@ import os
 import pickle
 from typing import List, Dict, Tuple
 import datetime
+import math
 
 import forecast.IO.file_reader as file_reader
 import forecast.graphs.quantitygraph as quantity_graph
@@ -10,10 +11,12 @@ import forecast.data_manipulation.group as group
 import forecast.data_manipulation.splitting as splitting
 import forecast.models.verification.model_accuracy as model_accuracy
 import forecast.data_manipulation.clean as clean
+import forecast.models.verification.error_calculations as error_calculations
 from forecast.models.agr.mock_model import MockModel
 from forecast.models.machine_learning.neural_network import NeuralNetwork
 from forecast.data_structures.records import ItemDateQuantityRecord
 from forecast.data_structures.output import PredictionOutput
+
 
 
 def init_logging(log_level):
@@ -156,8 +159,11 @@ def run():
     # Start by evaluating predictions for 4 weeks, but have it as a parameter
 
     # TODO output the std dev of the prediction stuff. Read and try to figure out
-    period = 'W'
-    number_of_predictions = 4
+    period = 'M'
+    num_input_nodes = 12  # First try is just using every week of last year
+    num_hidden_layers = 1
+    num_hidden_nodes_per_layer = 8
+    number_of_predictions = 4  # How many weeks into the future the models should predict
     init_logging(logging.INFO)
 
     forecast_pro_prediction_date = datetime.datetime(year=2016, month=2, day=6)
@@ -171,30 +177,85 @@ def run():
     sale_and_predictions_dict = join_sales_and_forecasts(sales_records, forecast_pro_forecast_records, period)
     logging.info("Joined sales and forecast list has {0} items".format(len(sale_and_predictions_dict)))
 
-    agr_models_error_dict = {}
-    # my_models_error_list = []  # TODO change to other data structure
+    nn_forecast_records = {}
+
+    fp_error_dict = {}
+    nn_error_dict = {}
+
+    total_number_of_items = len(sale_and_predictions_dict)
+    num_item_models_trained = 0
     for item_id, sales_prediction_records in sale_and_predictions_dict.items():
-        agr_model = MockModel(item_id, sales_prediction_records, number_of_predictions)
-        agr_error_list_for_item = agr_model.test()
-        agr_models_error_dict[item_id] = agr_error_list_for_item
+        if item_id != '7792':
+            continue
+        fp_model = MockModel(item_id, sales_prediction_records, number_of_predictions)
+        fp_error_list_for_item = fp_model.test()
+        fp_error_dict[item_id] = fp_error_list_for_item
 
-        # sales_records_for_item = sales_records[item_id]
-        # training_data, test_data, test_data_answers = splitting.to_train_and_test_date_split(sales_records_for_item,forecast_pro_prediction_date)
-        #
-        # logging.debug("Num training data: {0}, test data: {1}, test data answers: {2}". format(len(training_data), len(test_data), len(test_data_answers)))
-        # nn = NeuralNetwork(item_id, period)
-        # nn.train(training_data)
-        # nn_mae, nn_mape, nn_sales_prediction_records = model_accuracy.accuracy(nn, test_data, test_data_answers)
-        #
-        # my_models_error_list.append((item_id, nn_mae, nn_mape))
+        sales_records_for_item = sales_records[item_id]
+        training_records, test_records = splitting.to_train_and_test_date_split(sales_records_for_item,forecast_pro_prediction_date)
 
-    log_errors(agr_models_error_dict, "AGR", number_of_predictions)
-    # log_errors(my_models_error_list, "My NN")
+        is_sorted = _is_training_data_sorted(training_records)
+        if not is_sorted:
+            raise Exception("Training data for NN is not sorted by date !")
+
+        training_data = [x.quantity for x in training_records]
+        test_data = [x.quantity for x in test_records]
+
+        logging.debug("Num training data: {0}, test data: {1}".format(len(training_data), len(test_data)))
+        nn = NeuralNetwork(item_id, num_hidden_layers, num_hidden_nodes_per_layer, num_input_nodes)
+        train_score = nn.train(training_data)
+        logging.debug('Train Score: {0:.2f} )'.format(train_score))
+
+        nn_error_list = []
+        values_used_to_predict = training_data[-num_input_nodes:]  # Start using the last x values of the training set
+
+        # Predict for every test record in the test set
+        nn_forecast_records[item_id] = []
+        for i in range(len(test_records)-1):
+            test_record_being_predicted = test_records[i]
+            predicted_quantity = nn.predict(values_used_to_predict)
+            percentage_error = error_calculations.percentage_error(test_record_being_predicted.quantity, predicted_quantity)
+            date = test_record_being_predicted.date
+            sales_qty = test_record_being_predicted.quantity
+
+            if i < number_of_predictions:
+                # Our statistics only looks at the top [number_of_predictions] records
+                nn_error_list.append(PredictionOutput(item_id, date, sales_qty, predicted_quantity, percentage_error))
+                nn_error_dict[item_id] = nn_error_list
+
+            nn_forecast_records[item_id].append(ItemDateQuantityRecord(item_id, date, predicted_quantity))
+
+            # Add the newest predicted value to the list and remove the first one.
+            # We continue by predicting using the already predicted values as truth
+            values_used_to_predict.append(predicted_quantity)
+            values_used_to_predict = values_used_to_predict[1:]
+
+            logging.debug("Predicted for item {item_id} for date {date}. Counter {counter}".format(item_id=item_id, date=date, counter=i))
+        num_item_models_trained += 1
+        logging.info("Finished training a model. {0} out of {1} item models done".format(num_item_models_trained, total_number_of_items))
+
+    log_errors(fp_error_dict, "AGR", number_of_predictions)
+    log_errors(nn_error_dict, "My NN", number_of_predictions)
 
     item_id_to_graph = '7792'
     sales_records_for_item = sales_records[item_id_to_graph]
-    forecast_prof_records_for_item = forecast_pro_forecast_records[item_id_to_graph]
-    show_graph(sales_records_for_item, [("FP", forecast_prof_records_for_item)], item_id_to_graph)
+    fp_predictions_for_item = forecast_pro_forecast_records[item_id_to_graph]
+    nn_predictions_for_item = nn_forecast_records[item_id_to_graph]
+    show_graph(sales_records_for_item,
+               [("FP", fp_predictions_for_item), ("NN", nn_predictions_for_item)],
+               item_id_to_graph)
 
+
+def _is_training_data_sorted(training_data):
+    previous_date = None
+    for training_record in training_data:
+        if previous_date is None:
+            previous_date = training_record.date
+            continue
+
+        if training_record.date < previous_date:
+            return False
+
+    return True
 
 run()
