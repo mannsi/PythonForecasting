@@ -1,7 +1,7 @@
 import logging
 import os
 import pickle
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import datetime
 
 import forecast.IO.file_reader as file_reader
@@ -84,28 +84,41 @@ def group_item_quantity_records(item_quantity_records, group_by):
     return grouped_item_quantity_dict
 
 
-def join_sales_and_forecasts(sales_records: List[ItemDateQuantityRecord],
-                             forecast_records: List[ItemDateQuantityRecord], period):
+def join_sales_and_forecasts(sales_records: Dict[str, List[ItemDateQuantityRecord]],
+                             forecast_records: Dict[str, List[ItemDateQuantityRecord]],
+                             period: str):
     sale_and_predictions_pickle_file = period + "sale_and_predictions_list.pickle"
     try:
         sale_and_predictions_dict = pickle.load(open(sale_and_predictions_pickle_file, "rb"))
         logging.info("Loading joined sales and forecast list from memory")
     except (OSError, IOError) as e:
         logging.info("Starting to create joined record list")
-        sale_and_predictions_dict = group.join_dicts(sales_records, forecast_records)
+        sale_and_predictions_dict = group.join_sales_and_predictions(sales_records, forecast_records, True)
         logging.info("Finished making the list")
         pickle.dump(sale_and_predictions_dict, open(sale_and_predictions_pickle_file, "wb"))
     return sale_and_predictions_dict
 
 
-def show_graph(sale_and_predictions_list, item_id):
-    sales_dates = [x.date for x in sale_and_predictions_list]
-    sales_quantities = [x.sale_qty for x in sale_and_predictions_list]
-    predicted_quantities = [x.predicted_qty for x in sale_and_predictions_list]
+def show_graph(sales_values: List[ItemDateQuantityRecord],
+               prediction_lists: List[Tuple[str, List[ItemDateQuantityRecord]]],
+               item_id):
+    graph_line_list = []
+
+    sales_dates = [x.date for x in sales_values]
+    sales_quantities = [x.quantity for x in sales_values]
+    graph_line_list.append((sales_quantities, "Sales"))
+
+    for prediction_list in prediction_lists:
+        prediction_name = prediction_list[0]
+        predicted_records = prediction_list[1]
+        # Need to join together the sales and prediction data to get the right amount of data values for the graph
+        joined_predicted_records = group.zip_item_lists_on_date(sales_values, predicted_records, False)
+        joined_predicted_quantities = [x.predicted_qty for x in joined_predicted_records]
+        graph_line_list.append((joined_predicted_quantities, prediction_name))
 
     graph = quantity_graph.QuantityGraph(
         sales_dates,
-        [(sales_quantities, "Sales"), (predicted_quantities, "AGR forecast")],
+        graph_line_list,
         "Sales and models for item {0}".format(item_id))
     graph.display_graph()
 
@@ -150,12 +163,12 @@ def run():
     forecast_pro_prediction_date = datetime.datetime(year=2016, month=2, day=6)
 
     # Get the data from files and clean it
-    sales_records, forecast_records = get_forecast_and_sales_records(period)
-    logging.debug("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_records)))
-    sales_records, forecast_records = clean.remove_items_with_no_predictions(sales_records, forecast_records)
+    sales_records, forecast_pro_forecast_records = get_forecast_and_sales_records(period)
+    logging.debug("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_pro_forecast_records)))
+    sales_records, forecast_pro_forecast_records = clean.remove_items_with_no_predictions(sales_records, forecast_pro_forecast_records)
 
-    logging.debug("Sales records: {0}, forecast records: {1} after cleaning".format(len(sales_records), len(forecast_records)))
-    sale_and_predictions_dict = join_sales_and_forecasts(sales_records, forecast_records, period)
+    logging.debug("Sales records: {0}, forecast records: {1} after cleaning".format(len(sales_records), len(forecast_pro_forecast_records)))
+    sale_and_predictions_dict = join_sales_and_forecasts(sales_records, forecast_pro_forecast_records, period)
     logging.info("Joined sales and forecast list has {0} items".format(len(sale_and_predictions_dict)))
 
     agr_models_error_dict = {}
@@ -179,7 +192,9 @@ def run():
     # log_errors(my_models_error_list, "My NN")
 
     item_id_to_graph = '7792'
-    show_graph(sale_and_predictions_dict[item_id_to_graph], item_id_to_graph)
+    sales_records_for_item = sales_records[item_id_to_graph]
+    forecast_prof_records_for_item = forecast_pro_forecast_records[item_id_to_graph]
+    show_graph(sales_records_for_item, [("FP", forecast_prof_records_for_item)], item_id_to_graph)
 
 
 run()
