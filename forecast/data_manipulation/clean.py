@@ -5,11 +5,10 @@ from typing import List, Dict
 from forecast.data_structures.records import ItemDateQuantityRecord
 
 
-def drop_first_and_last_values_for_each_item(grouped_forecast_records):
+def drop_first_values_for_each_item(grouped_records: Dict[str, List[ItemDateQuantityRecord]]):
     updated_dict = {}
-    for item_id, item_records in grouped_forecast_records.items():
+    for item_id, item_records in grouped_records.items():
         all_dates_for_item = [x.date for x in item_records]
-        item_records = [x for x in item_records if x.date != max(all_dates_for_item)]
         item_records = [x for x in item_records if x.date != min(all_dates_for_item)]
         updated_dict[item_id] = item_records
 

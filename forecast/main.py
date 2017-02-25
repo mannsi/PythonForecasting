@@ -60,13 +60,16 @@ def get_forecast_and_sales_records(
     except (OSError, IOError) as e:
         sales_file_abs_path = os.path.abspath(os.path.join("files", "histories_sales.txt"))
         sales_records = file_reader.get_sample_history_sales_values(sales_file_abs_path)
-        grouped_sales_records = group_item_quantity_records(sales_records, group_by)
-        grouped_sales_records = clean.remove_nan_quantity_values(grouped_sales_records)
 
         # Shift the data so it fits nicely f.x. to weeks or months
         for item_id, records_for_item in sales_records.items():
             clean.shift_data_by_days(records_for_item, days_to_shift)
 
+        grouped_sales_records = group_item_quantity_records(sales_records, group_by)
+        grouped_sales_records = clean.remove_nan_quantity_values(grouped_sales_records)
+
+        # First record is not a whole month. That is why we remove it
+        grouped_sales_records = clean.drop_first_values_for_each_item(grouped_sales_records)
         pickle.dump(grouped_sales_records, open(sales_values_pickle_file, "wb"))
         num_sales_records = sum([len(item_records) for item_id, item_records in sales_records.items()])
         logging.info("Found {0} items with {1} number of sales values and grouped them down to {2}"
@@ -190,7 +193,6 @@ def run():
     prediction_cut_date = datetime.datetime(year=2016, month=2, day=1)  # The date FP predicted from
     max_prediction_date = datetime.datetime(year=2016, month=8, day=1)
 
-
     period = 'M'
     if period == 'W':
         steps_to_measure_accuracy = [4, 12, 26]  # Points when precision is calculated and logged
@@ -208,7 +210,7 @@ def run():
     # Get data from files
     sales_records, fp_forecast_records = get_data(period, days_to_shift)
 
-    items_to_predict = ['2648']
+    items_to_predict = ['7751']
     # items_to_predict = list(sales_records.keys())
 
     nn_forecasts = {}
