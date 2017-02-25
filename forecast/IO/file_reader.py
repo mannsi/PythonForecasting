@@ -1,9 +1,10 @@
 import csv
 import datetime
+from typing import Dict, List
 from forecast.data_structures.records import ItemDateQuantityRecord
 
 
-def get_sample_forecast_values(file_path):
+def get_sample_forecast_values(file_path) -> Dict[str, List[ItemDateQuantityRecord]]:
     """
     :return: dict of {item_id: list of ItemDateQuantityRecord}
     """

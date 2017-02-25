@@ -1,9 +1,9 @@
-from typing import List, Dict
+from typing import List
 import datetime
-from forecast.data_structures.records import ItemDateQuantityRecord, ItemDateRecord, SaleAndPredictionRecord
+from forecast.data_structures.records import ItemDateQuantityRecord
 
 
-def to_train_and_test_date_split(sales_prediction_records: List[ItemDateQuantityRecord], date_split: datetime):
+def train_test_split(sales_prediction_records: List[ItemDateQuantityRecord], date_split: datetime):
     """
     Creates train_data, test_data
     :param sales_prediction_records:

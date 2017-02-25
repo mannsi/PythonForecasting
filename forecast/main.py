@@ -4,30 +4,33 @@ import pickle
 from typing import List, Dict, Tuple
 import datetime
 import math
+import random
 
+import forecast.models.verification.error_calculations as error_calculations
 import forecast.IO.file_reader as file_reader
 import forecast.graphs.quantitygraph as quantity_graph
 import forecast.data_manipulation.group as group
 import forecast.data_manipulation.splitting as splitting
-import forecast.models.verification.model_accuracy as model_accuracy
 import forecast.data_manipulation.clean as clean
-import forecast.models.verification.error_calculations as error_calculations
+import forecast.models.machine_learning.neural_network_helper as nn_helper
 from forecast.models.agr.mock_model import MockModel
 from forecast.models.machine_learning.neural_network import NeuralNetwork
 from forecast.data_structures.records import ItemDateQuantityRecord
-from forecast.data_structures.output import PredictionOutput
-
+from forecast.data_structures.output import PredictionRecord
 
 
 def init_logging(log_level):
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def get_forecast_and_sales_records(group_by):
+def get_forecast_and_sales_records(
+        group_by: str,
+        days_to_shift: int) -> Tuple[Dict[str, List[ItemDateQuantityRecord]], Dict[str, List[ItemDateQuantityRecord]]]:
     """
     Gets the tuple grouped_sales_records, grouped_forecast_records
-    :param group_by: string
-    :return: ({item_id: list of ItemDateQuantityRecord}, {item_id: list of records..ItemDateQuantityRecord})
+    :param days_to_shift:
+    :param group_by: 'W' or 'M'
+    :return: ({item_id: list of sales records}, {item_id: list of forecast records})
     """
     forecast_value_pickle_file = group_by + "forecast_values.pickle"
     sales_values_pickle_file = group_by + "sales_values.pickle"
@@ -38,14 +41,18 @@ def get_forecast_and_sales_records(group_by):
     except (OSError, IOError) as e:
         forecast_file_abs_path = os.path.abspath(os.path.join("files", "forecast_values.txt"))
         forecast_records = file_reader.get_sample_forecast_values(forecast_file_abs_path)
+
+        # Shift the data so it fits nicely f.x. to weeks or months
+        for item_id, records_for_item in forecast_records.items():
+            clean.shift_data_by_days(records_for_item, days_to_shift)
+
         grouped_forecast_records = group_item_quantity_records(forecast_records, group_by)
         grouped_forecast_records = clean.remove_nan_quantity_values(grouped_forecast_records)
-        grouped_forecast_records = clean.drop_first_and_last_values_for_each_item(grouped_forecast_records)
         pickle.dump(grouped_forecast_records, open(forecast_value_pickle_file, "wb"))
 
         num_forecast_records = sum([len(item_records) for item_id, item_records in forecast_records.items()])
         logging.info("Found {0} items with {1} number of forecast values and grouped them down to {2}"
-                      .format(len(forecast_records), num_forecast_records, len(grouped_forecast_records)))
+                     .format(len(forecast_records), num_forecast_records, len(grouped_forecast_records)))
 
     try:
         grouped_sales_records = pickle.load(open(sales_values_pickle_file, "rb"))
@@ -55,21 +62,27 @@ def get_forecast_and_sales_records(group_by):
         sales_records = file_reader.get_sample_history_sales_values(sales_file_abs_path)
         grouped_sales_records = group_item_quantity_records(sales_records, group_by)
         grouped_sales_records = clean.remove_nan_quantity_values(grouped_sales_records)
-        grouped_sales_records = clean.drop_first_and_last_values_for_each_item(grouped_sales_records)
-        pickle.dump(grouped_sales_records, open(sales_values_pickle_file, "wb"))
 
+        # Shift the data so it fits nicely f.x. to weeks or months
+        for item_id, records_for_item in sales_records.items():
+            clean.shift_data_by_days(records_for_item, days_to_shift)
+
+        pickle.dump(grouped_sales_records, open(sales_values_pickle_file, "wb"))
         num_sales_records = sum([len(item_records) for item_id, item_records in sales_records.items()])
         logging.info("Found {0} items with {1} number of sales values and grouped them down to {2}"
-                      .format(len(sales_records), num_sales_records, len(grouped_sales_records)))
+                     .format(len(sales_records), num_sales_records, len(grouped_sales_records)))
 
     return grouped_sales_records, grouped_forecast_records
 
 
-def group_item_quantity_records(item_quantity_records, group_by):
+def group_item_quantity_records(
+        item_quantity_records: Dict[str, List[ItemDateQuantityRecord]],
+        group_by: str) -> Dict[str, List[ItemDateQuantityRecord]]:
     """
 
+    :param initial_date: The initial date that should be grouped from
     :param item_quantity_records: {item_id: list of ItemDateQuantityRecord}
-    :param group_by: string
+    :param group_by: Either 'W' or 'M" for weeks and months
     :return: {item_id: list of ItemDateQuantityRecord}
     """
     grouped_item_quantity_dict = {}
@@ -87,26 +100,13 @@ def group_item_quantity_records(item_quantity_records, group_by):
     return grouped_item_quantity_dict
 
 
-def join_sales_and_forecasts(sales_records: Dict[str, List[ItemDateQuantityRecord]],
-                             forecast_records: Dict[str, List[ItemDateQuantityRecord]],
-                             period: str):
-    sale_and_predictions_pickle_file = period + "sale_and_predictions_list.pickle"
-    try:
-        sale_and_predictions_dict = pickle.load(open(sale_and_predictions_pickle_file, "rb"))
-        logging.info("Loading joined sales and forecast list from memory")
-    except (OSError, IOError) as e:
-        logging.info("Starting to create joined record list")
-        sale_and_predictions_dict = group.join_sales_and_predictions(sales_records, forecast_records, True)
-        logging.info("Finished making the list")
-        pickle.dump(sale_and_predictions_dict, open(sale_and_predictions_pickle_file, "wb"))
-    return sale_and_predictions_dict
-
-
 def show_graph(sales_values: List[ItemDateQuantityRecord],
-               prediction_lists: List[Tuple[str, List[ItemDateQuantityRecord]]],
-               item_id):
+               prediction_lists: List[Tuple[str, List[PredictionRecord]]],
+               item_id,
+               max_prediction_date: datetime.datetime):
     graph_line_list = []
 
+    sales_values = [x for x in sales_values if x.date <= max_prediction_date]
     sales_dates = [x.date for x in sales_values]
     sales_quantities = [x.quantity for x in sales_values]
     graph_line_list.append((sales_quantities, "Sales"))
@@ -114,10 +114,21 @@ def show_graph(sales_values: List[ItemDateQuantityRecord],
     for prediction_list in prediction_lists:
         prediction_name = prediction_list[0]
         predicted_records = prediction_list[1]
-        # Need to join together the sales and prediction data to get the right amount of data values for the graph
-        joined_predicted_records = group.zip_item_lists_on_date(sales_values, predicted_records, False)
-        joined_predicted_quantities = [x.predicted_qty for x in joined_predicted_records]
-        graph_line_list.append((joined_predicted_quantities, prediction_name))
+        generated_prediction_values = []
+        for sales_value in sales_values:
+            sale_date_found = False
+            for predicted_record in predicted_records:
+                if sales_value.date == predicted_record.date:
+                    # This if for sanity checking
+                    if sales_value.quantity != predicted_record.qty:
+                        raise Exception("Why is the sales value and qty from prediction record not the same ?!?!?!?!")
+
+                    generated_prediction_values.append(predicted_record.predicted_qty)
+                    sale_date_found = True
+            if not sale_date_found:
+                generated_prediction_values.append(None)
+
+        graph_line_list.append((generated_prediction_values, prediction_name))
 
     graph = quantity_graph.QuantityGraph(
         sales_dates,
@@ -126,124 +137,116 @@ def show_graph(sales_values: List[ItemDateQuantityRecord],
     graph.display_graph()
 
 
-def log_errors(prediction_outputs: Dict[str, List[PredictionOutput]], model_name, num_predictions_per_item):
+def log_errors(predictions: Dict[str, List[PredictionRecord]],
+               model_name: str,
+               steps_to_measure_accuracy: List[int],
+               steps_name: List[str]):
     """
     Log error values to current log output
-    :param prediction_outputs:
-    :param error_list: Dict{item_id: List(date, sale_qty, predicted_qty, mape)}
+    :param steps_to_measure_accuracy: list of indexes where we want to output the accuracy of the model
+    :param model_name: the name of the model being used
+    :param predictions:
     """
 
-    # TODO
-    logging.debug("Details for model {model}".format(model=model_name))
-    # prediction_outputs_for_all_items = []  # List of prediction output tuples
-    # for item_id, prediction_outputs in prediction_outputs.items():
-    #     # logging.debug("Item {0} had {1}% avg error and {2} abs avg error".format(error[0], error[2], error[1]))
-    #     prediction_outputs_for_all_items.append(prediction_outputs)
-    #     max_num_output_predictions = max(max_num_output_predictions, len(prediction_outputs))
+    error_list = error_calculations.average_percentage_error(predictions, steps_to_measure_accuracy)
 
-    average_error_values_per_prediction = []
+    for i in range(len(error_list)):
+        error = error_list[i]
+        step_name = steps_name[i]
+        logging.info("Average percentage error for {step_name}: {error_val:.2f}% using model {model}"
+                     .format(step_name=step_name, error_val=error, model=model_name))
 
-    for i in range(num_predictions_per_item):
-        prediction_values_for_date = [x[i] for x in prediction_outputs.values()]
-        unique_prediction_dates = len(set([x.date for x in prediction_values_for_date]))
-        if unique_prediction_dates != 1:
-            raise Exception("All predictions should be for the same date. Something is wrong with the data")
-        all_errors_for_this_dates_prediction = [x.error for x in prediction_values_for_date]
-        average_error_for_prediction = float(sum(all_errors_for_this_dates_prediction)) / len(all_errors_for_this_dates_prediction)
-        average_error_values_per_prediction.append(average_error_for_prediction)
-        logging.info("Average percentage error for prediction {prediction_description} is {av_error:.2f}"
-                     .format(prediction_description=i+1, av_error=average_error_for_prediction))
+
+def get_data(period, date_shift):
+    # Get the data from files and clean it
+    sales_records, forecast_pro_forecast_records = get_forecast_and_sales_records(period, date_shift)
+    logging.debug("Sales records: {0}, forecast records: {1}"
+                  .format(len(sales_records), len(forecast_pro_forecast_records)))
+    sales_records, forecast_pro_forecast_records = clean.remove_items_with_no_predictions(sales_records,
+                                                                                          forecast_pro_forecast_records)
+    logging.debug("Sales records: {0}, forecast records: {1} after cleaning"
+                  .format(len(sales_records), len(forecast_pro_forecast_records)))
+
+    return sales_records, forecast_pro_forecast_records
+
+
+def verify_training_records_are_sorted(training_records):
+    is_sorted = _is_training_data_sorted(training_records)
+    if not is_sorted:
+        raise Exception("Training data for NN is not sorted by date !")
 
 
 def run():
-    # Start by evaluating predictions for 4 weeks, but have it as a parameter
-
-    # TODO output the std dev of the prediction stuff. Read and try to figure out
-    period = 'M'
-    num_input_nodes = 12  # First try is just using every week of last year
-    num_hidden_layers = 1
-    num_hidden_nodes_per_layer = 8
-    number_of_predictions = 4  # How many weeks into the future the models should predict
     init_logging(logging.INFO)
 
-    forecast_pro_prediction_date = datetime.datetime(year=2016, month=2, day=6)
+    # TODO output the std dev of the prediction stuff. Read and try to figure out
 
-    # Get the data from files and clean it
-    sales_records, forecast_pro_forecast_records = get_forecast_and_sales_records(period)
-    logging.debug("Sales records: {0}, forecast records: {1}".format(len(sales_records), len(forecast_pro_forecast_records)))
-    sales_records, forecast_pro_forecast_records = clean.remove_items_with_no_predictions(sales_records, forecast_pro_forecast_records)
+    # Constants
+    num_hidden_layers = 1
+    num_hidden_nodes_per_layer = 8
 
-    logging.debug("Sales records: {0}, forecast records: {1} after cleaning".format(len(sales_records), len(forecast_pro_forecast_records)))
-    sale_and_predictions_dict = join_sales_and_forecasts(sales_records, forecast_pro_forecast_records, period)
-    logging.info("Joined sales and forecast list has {0} items".format(len(sale_and_predictions_dict)))
+    fp_prediction_date = datetime.datetime(year=2016, month=2, day=6)  # The date FP predicted from
+    days_to_shift = -fp_prediction_date.day  # Shift by these days so predictions start from the 1. of the month
+    prediction_cut_date = datetime.datetime(year=2016, month=2, day=1)  # The date FP predicted from
+    max_prediction_date = datetime.datetime(year=2016, month=8, day=1)
 
-    nn_forecast_records = {}
 
-    fp_error_dict = {}
-    nn_error_dict = {}
+    period = 'M'
+    if period == 'W':
+        steps_to_measure_accuracy = [4, 12, 26]  # Points when precision is calculated and logged
+        step_name = ["1 month prediction", "3 month prediction",
+                     "6 month prediction"]  # Points when precision is calculated and logged
+        number_of_predictions = 26  # How many weeks into the future the models should predict
+        num_input_nodes = 52
+    if period == 'M':
+        steps_to_measure_accuracy = [1, 3, 6]  # Points when precision is calculated and logged
+        step_name = ["1 month prediction", "3 month prediction",
+                     "6 month prediction"]  # Points when precision is calculated and logged
+        number_of_predictions = 6  # How many months into the future the models should predict
+        num_input_nodes = 12
 
-    total_number_of_items = len(sale_and_predictions_dict)
+    # Get data from files
+    sales_records, fp_forecast_records = get_data(period, days_to_shift)
+
+    items_to_predict = ['2648']
+    # items_to_predict = list(sales_records.keys())
+
+    nn_forecasts = {}
+    fp_forecasts = {}
+
     num_item_models_trained = 0
-    for item_id, sales_prediction_records in sale_and_predictions_dict.items():
-        if item_id != '7792':
-            continue
-        fp_model = MockModel(item_id, sales_prediction_records, number_of_predictions)
-        fp_error_list_for_item = fp_model.test()
-        fp_error_dict[item_id] = fp_error_list_for_item
+    for item_id in items_to_predict:
+        # Forecast pro forecasts
+        fp_model = MockModel(item_id, sales_records[item_id], fp_forecast_records[item_id], number_of_predictions)
+        fp_forecasts_for_item = fp_model.test()
+        fp_forecasts[item_id] = fp_forecasts_for_item
 
-        sales_records_for_item = sales_records[item_id]
-        training_records, test_records = splitting.to_train_and_test_date_split(sales_records_for_item,forecast_pro_prediction_date)
+        # Neural network forecasts
+        # training_records, test_records = splitting.train_test_split(sales_records[item_id], prediction_cut_date)
+        # verify_training_records_are_sorted(training_records)  # Blows up if training records are not in date order
+        # training_data = [x.quantity for x in training_records]  # NN only cares about a list of numbers, not dates
+        #
+        # nn = NeuralNetwork(item_id, num_hidden_layers, num_hidden_nodes_per_layer, num_input_nodes)
+        # nn.train(training_data)
+        #
+        # init_values_to_predict = training_data[-nn.num_input_nodes:]  # The last x values of the training set
+        # nn_forecasts_for_item = nn_helper.get_forecasts_for_nn(item_id, nn, init_values_to_predict, test_records)
+        # nn_forecasts[item_id] = nn_forecasts_for_item
+        #
+        # num_item_models_trained += 1
+        # logging.info("Finished training a model. {0} out of {1} item models done"
+        #              .format(num_item_models_trained, len(items_to_predict)))
 
-        is_sorted = _is_training_data_sorted(training_records)
-        if not is_sorted:
-            raise Exception("Training data for NN is not sorted by date !")
+    log_errors(fp_forecasts, "AGR", steps_to_measure_accuracy, step_name)
+    # log_errors(nn_forecasts, "My NN", steps_to_measure_accuracy, step_name)
 
-        training_data = [x.quantity for x in training_records]
-        test_data = [x.quantity for x in test_records]
-
-        logging.debug("Num training data: {0}, test data: {1}".format(len(training_data), len(test_data)))
-        nn = NeuralNetwork(item_id, num_hidden_layers, num_hidden_nodes_per_layer, num_input_nodes)
-        train_score = nn.train(training_data)
-        logging.debug('Train Score: {0:.2f} )'.format(train_score))
-
-        nn_error_list = []
-        values_used_to_predict = training_data[-num_input_nodes:]  # Start using the last x values of the training set
-
-        # Predict for every test record in the test set
-        nn_forecast_records[item_id] = []
-        for i in range(len(test_records)-1):
-            test_record_being_predicted = test_records[i]
-            predicted_quantity = nn.predict(values_used_to_predict)
-            percentage_error = error_calculations.percentage_error(test_record_being_predicted.quantity, predicted_quantity)
-            date = test_record_being_predicted.date
-            sales_qty = test_record_being_predicted.quantity
-
-            if i < number_of_predictions:
-                # Our statistics only looks at the top [number_of_predictions] records
-                nn_error_list.append(PredictionOutput(item_id, date, sales_qty, predicted_quantity, percentage_error))
-                nn_error_dict[item_id] = nn_error_list
-
-            nn_forecast_records[item_id].append(ItemDateQuantityRecord(item_id, date, predicted_quantity))
-
-            # Add the newest predicted value to the list and remove the first one.
-            # We continue by predicting using the already predicted values as truth
-            values_used_to_predict.append(predicted_quantity)
-            values_used_to_predict = values_used_to_predict[1:]
-
-            logging.debug("Predicted for item {item_id} for date {date}. Counter {counter}".format(item_id=item_id, date=date, counter=i))
-        num_item_models_trained += 1
-        logging.info("Finished training a model. {0} out of {1} item models done".format(num_item_models_trained, total_number_of_items))
-
-    log_errors(fp_error_dict, "AGR", number_of_predictions)
-    log_errors(nn_error_dict, "My NN", number_of_predictions)
-
-    item_id_to_graph = '7792'
-    sales_records_for_item = sales_records[item_id_to_graph]
-    fp_predictions_for_item = forecast_pro_forecast_records[item_id_to_graph]
-    nn_predictions_for_item = nn_forecast_records[item_id_to_graph]
-    show_graph(sales_records_for_item,
-               [("FP", fp_predictions_for_item), ("NN", nn_predictions_for_item)],
-               item_id_to_graph)
+    id_to_graph = items_to_predict[0]
+    show_graph(sales_records[id_to_graph],
+               [("FP", fp_forecasts[id_to_graph])
+                   # , ("NN", nn_forecasts[id_to_graph])
+                ],
+               id_to_graph,
+               max_prediction_date)
 
 
 def _is_training_data_sorted(training_data):
@@ -257,5 +260,6 @@ def _is_training_data_sorted(training_data):
             return False
 
     return True
+
 
 run()

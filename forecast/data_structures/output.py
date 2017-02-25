@@ -1,6 +1,6 @@
 
 
-class PredictionOutput:
+class PredictionRecord:
     def __init__(self, item_id, date, qty, predicted_qty, error):
         self.date = date
         self.qty = qty

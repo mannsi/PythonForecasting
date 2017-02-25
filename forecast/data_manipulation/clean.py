@@ -1,4 +1,5 @@
 import math
+import datetime
 import logging
 from typing import List, Dict
 from forecast.data_structures.records import ItemDateQuantityRecord
@@ -60,3 +61,8 @@ def remove_items_with_no_predictions(sales_records: Dict[str, List[ItemDateQuant
         cleaned_item_prediction_dict[sales_item_id] = predicted_records_for_item
 
     return cleaned_item_sales_dict, cleaned_item_prediction_dict
+
+
+def shift_data_by_days(records: List[ItemDateQuantityRecord], days_to_shift: int):
+    for record in records:
+        record.date = record.date + datetime.timedelta(days=days_to_shift)
