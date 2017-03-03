@@ -1,7 +1,8 @@
 import csv
 import datetime
 from typing import Dict, List
-from forecast.data_structures.records import ItemDateQuantityRecord
+
+from forecast.data.structures import ItemDateQuantityRecord
 
 
 def get_sample_forecast_values(file_path) -> Dict[str, List[ItemDateQuantityRecord]]:

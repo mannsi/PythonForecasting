@@ -1,7 +1,7 @@
 import logging
 
 import forecast.models.verification.error_calculations as error_calculations
-from forecast.data_structures.output import PredictionRecord
+from forecast.data.structures import PredictionRecord
 
 
 def get_forecasts_for_nn(item_id, nn, values_used_to_predict, test_records):

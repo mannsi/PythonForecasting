@@ -1,5 +1,4 @@
 from typing import List
-from forecast.data_structures.records import ItemDateQuantityRecord
 
 
 class AbstractModel:

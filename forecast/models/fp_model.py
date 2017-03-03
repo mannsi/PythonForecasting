@@ -1,11 +1,11 @@
 import logging
 from typing import List
-from forecast.data_structures.records import ItemDateQuantityRecord
-from forecast.data_structures.output import PredictionRecord
+
 import forecast.models.verification.error_calculations as error_calculations
+from forecast.data.structures import PredictionRecord, ItemDateQuantityRecord
 
 
-class MockModel:
+class fp_model:
     def __init__(self,
                  item_id: str,
                  sales_records: List[ItemDateQuantityRecord],

@@ -6,7 +6,7 @@ from keras.models import Sequential
 from keras.layers import Dense
 
 
-class NeuralNetwork(AbstractModel):
+class nn_model(AbstractModel):
     def __init__(self, item_id, num_hidden_layers: int, num_nodes_per_hidden_layer: int, num_input_nodes: int):
         """
 

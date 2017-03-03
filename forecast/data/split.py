@@ -1,6 +1,7 @@
-from typing import List
 import datetime
-from forecast.data_structures.records import ItemDateQuantityRecord
+from typing import List
+
+from forecast.data.structures import ItemDateQuantityRecord
 
 
 def train_test_split(sales_prediction_records: List[ItemDateQuantityRecord], date_split: datetime):

@@ -1,8 +1,7 @@
 import math
-import logging
 from typing import Dict, List
 
-from forecast.data_structures.output import PredictionRecord
+from forecast.data.structures import PredictionRecord
 
 
 def weighted_average(errors: List[float]) -> float:

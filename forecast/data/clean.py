@@ -1,8 +1,9 @@
-import math
 import datetime
 import logging
+import math
 from typing import List, Dict
-from forecast.data_structures.records import ItemDateQuantityRecord
+
+from forecast.data.structures import ItemDateQuantityRecord
 
 
 def drop_first_values_for_each_item(grouped_records: Dict[str, List[ItemDateQuantityRecord]]):

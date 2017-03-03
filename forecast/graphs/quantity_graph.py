@@ -46,7 +46,7 @@ class QuantityGraph:
         fig.autofmt_xdate()
 
         manager = plt.get_current_fig_manager()
-        manager.window.state('zoomed')  # works fine on Windows!
+        # manager.window.state('zoomed')  # works fine on Windows!
         # manager.resize(*manager.window.maxsize()) # Maybe this works on linux
 
 
