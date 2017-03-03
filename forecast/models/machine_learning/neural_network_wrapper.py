@@ -7,7 +7,7 @@ from forecast.data.structures import PredictionRecord
 def get_forecasts_for_nn(item_id, nn, values_used_to_predict, test_records):
     nn_forecasts = []
 
-    for i in range(len(test_records) - 1):
+    for i in range(len(test_records)):
         test_record_being_predicted = test_records[i]
         predicted_quantity = nn.predict(values_used_to_predict)
         date = test_record_being_predicted.date

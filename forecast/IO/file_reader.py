@@ -5,7 +5,7 @@ from typing import Dict, List
 from forecast.data.structures import ItemDateQuantityRecord
 
 
-def get_sample_forecast_values(file_path) -> Dict[str, List[ItemDateQuantityRecord]]:
+def get_sample_forecast_values(file_path, max_date: datetime.datetime) -> Dict[str, List[ItemDateQuantityRecord]]:
     """
     :return: dict of {item_id: list of ItemDateQuantityRecord}
     """
@@ -16,13 +16,15 @@ def get_sample_forecast_values(file_path) -> Dict[str, List[ItemDateQuantityReco
         reader = csv.reader(f, delimiter='\t')
         for item_id, random_value, date_string, qty_string in reader:
             record = ItemDateQuantityRecord(item_id, datetime.datetime.strptime(date_string, "%Y-%m-%d"), float(qty_string))
+            if record.date > max_date:
+                continue
             if record.item_id not in data_records:
                 data_records[record.item_id] = []
             data_records[record.item_id].append(record)
     return data_records
 
 
-def get_sample_history_sales_values(file_path):
+def get_sample_history_sales_values(file_path, max_date: datetime.datetime):
     """
     :return: dict of {item_id: list of ItemDateQuantityRecord}
     """
@@ -32,6 +34,8 @@ def get_sample_history_sales_values(file_path):
         reader = csv.reader(f, delimiter='\t')
         for item_id, date_string, qty_string in reader:
             record = ItemDateQuantityRecord(item_id, datetime.datetime.strptime(date_string, "%Y-%m-%d"), float(qty_string))
+            if record.date > max_date:
+                continue
             if record.item_id not in data_records:
                 data_records[record.item_id] = []
             data_records[record.item_id].append(record)

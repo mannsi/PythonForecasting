@@ -7,11 +7,9 @@ from forecast.data.structures import ItemDateQuantityRecord, PredictionRecord
 
 def show_quantity_graph(sales_values: List[ItemDateQuantityRecord],
                         prediction_lists: List[Tuple[str, List[PredictionRecord]]],
-                        item_id,
-                        max_prediction_date: datetime.datetime):
+                        item_id):
     graph_line_list = []
 
-    sales_values = [x for x in sales_values if x.date <= max_prediction_date]
     sales_dates = [x.date for x in sales_values]
     sales_quantities = [x.quantity for x in sales_values]
     graph_line_list.append((sales_quantities, "Sales"))

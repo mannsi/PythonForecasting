@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+import datetime
 from typing import Tuple, List, Dict
 
 import forecast.IO.file_reader as file_reader
@@ -9,9 +10,13 @@ import forecast.data.group as group
 from forecast.data.structures import ItemDateQuantityRecord
 
 
-def get_data(period, date_shift):
+def data_from_files(period):
     # Get the data from files and clean it
-    sales_records, forecast_pro_forecast_records = _get_forecast_and_sales_records(period, date_shift)
+    fp_prediction_date = datetime.datetime(year=2016, month=2, day=6)  # The date FP predicted from
+    days_to_shift = -fp_prediction_date.day  # Shift by these days so predictions start from the 1. of the month
+    max_prediction_date = datetime.datetime(year=2016, month=8, day=1)  # Just want to predict 6 months into the future
+
+    sales_records, forecast_pro_forecast_records = _get_forecast_and_sales_records(period, days_to_shift, max_prediction_date)
     logging.debug("Sales records: {0}, forecast records: {1}"
                   .format(len(sales_records), len(forecast_pro_forecast_records)))
     sales_records, forecast_pro_forecast_records = clean.remove_items_with_no_predictions(sales_records,
@@ -24,11 +29,13 @@ def get_data(period, date_shift):
 
 def _get_forecast_and_sales_records(
         group_by: str,
-        days_to_shift: int) -> Tuple[Dict[str, List[ItemDateQuantityRecord]], Dict[str, List[ItemDateQuantityRecord]]]:
+        days_to_shift: int,
+        max_date: datetime.datetime) -> Tuple[Dict[str, List[ItemDateQuantityRecord]], Dict[str, List[ItemDateQuantityRecord]]]:
     """
     Gets the tuple grouped_sales_records, grouped_forecast_records
     :param days_to_shift:
     :param group_by: 'W' or 'M'
+    :param max_date: The cut off date for data
     :return: ({item_id: list of sales records}, {item_id: list of forecast records})
     """
     files_directory = os.path.join("data", "files")
@@ -40,7 +47,7 @@ def _get_forecast_and_sales_records(
         logging.debug("Loading forecast list from memory")
     except (OSError, IOError) as e:
         forecast_file_abs_path = os.path.abspath(os.path.join(files_directory, "forecast_values.txt"))
-        forecast_records = file_reader.get_sample_forecast_values(forecast_file_abs_path)
+        forecast_records = file_reader.get_sample_forecast_values(forecast_file_abs_path, max_date)
 
         # Shift the data so it fits nicely f.x. to weeks or months
         for item_id, records_for_item in forecast_records.items():
@@ -59,7 +66,7 @@ def _get_forecast_and_sales_records(
         logging.debug("Loading sales list from memory")
     except (OSError, IOError) as e:
         sales_file_abs_path = os.path.abspath(os.path.join(files_directory, "histories_sales.txt"))
-        sales_records = file_reader.get_sample_history_sales_values(sales_file_abs_path)
+        sales_records = file_reader.get_sample_history_sales_values(sales_file_abs_path, max_date)
 
         # Shift the data so it fits nicely f.x. to weeks or months
         for item_id, records_for_item in sales_records.items():
