@@ -6,7 +6,7 @@ def init_file_and_console_logging(console_log_level, file_log_level, file_name):
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
 
-    file_handler = logging.FileHandler("{0}.log".format(file_name))
+    file_handler = logging.FileHandler("{0}".format(file_name))
     file_handler.setFormatter(log_formatter)
     file_handler.setLevel(file_log_level)
     root_logger.addHandler(file_handler)

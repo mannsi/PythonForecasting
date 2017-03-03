@@ -16,8 +16,8 @@ def save_prediction_results(predictions: Dict[str, List[PredictionRecord]],
 
     error_list = error_calculations.average_percentage_error(predictions, num_prediction_per_item)
     average_weighted_error = error_calculations.weighted_average(error_list)
-    logging.info("Average weighted errors for {model_name:.2f} {average_weighted_error}"
-                 .format(model_name=model_name, average_weighted_error= average_weighted_error))
+    logging.info("Average weighted errors for {model_name} {average_weighted_error:.2f}"
+                 .format(model_name=model_name, average_weighted_error=average_weighted_error))
 
     for i in range(len(error_list)):
         error = error_list[i]
