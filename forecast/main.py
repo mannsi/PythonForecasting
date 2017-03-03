@@ -141,23 +141,23 @@ def show_graph(sales_values: List[ItemDateQuantityRecord],
 
 
 def log_errors(predictions: Dict[str, List[PredictionRecord]],
-               model_name: str,
-               steps_to_measure_accuracy: List[int],
-               steps_name: List[str]):
+               model_name: str, num_prediction_per_item: int):
     """
     Log error values to current log output
-    :param steps_to_measure_accuracy: list of indexes where we want to output the accuracy of the model
+    :param num_prediction_per_item: number of predictions per item
     :param model_name: the name of the model being used
     :param predictions:
     """
 
-    error_list = error_calculations.average_percentage_error(predictions, steps_to_measure_accuracy)
+    error_list = error_calculations.average_percentage_error(predictions, num_prediction_per_item)
+    average_weighted_error = error_calculations.weighted_average(error_list)
+    logging.info("Average weighted errors for {model_name} {average_weighted_error}"
+                 .format(model_name=model_name, average_weighted_error= average_weighted_error))
 
     for i in range(len(error_list)):
         error = error_list[i]
-        step_name = steps_name[i]
-        logging.info("Average percentage error for {step_name}: {error_val:.2f}% using model {model}"
-                     .format(step_name=step_name, error_val=error, model=model_name))
+        logging.info("Average percentage error for period {period}: {error_val:.2f}% using model {model}"
+                     .format(period=i+1, error_val=error, model=model_name))
 
 
 def get_data(period, date_shift):
@@ -195,23 +195,23 @@ def run():
 
     period = 'M'
     if period == 'W':
-        steps_to_measure_accuracy = [4, 12, 26]  # Points when precision is calculated and logged
-        step_name = ["1 month prediction", "3 month prediction",
-                     "6 month prediction"]  # Points when precision is calculated and logged
+        # steps_to_measure_accuracy = [4, 12, 26]  # Points when precision is calculated and logged
+        # step_name = ["1 month prediction", "3 month prediction",
+        #              "6 month prediction"]  # Points when precision is calculated and logged
         number_of_predictions = 26  # How many weeks into the future the models should predict
         num_input_nodes = 52
     if period == 'M':
-        steps_to_measure_accuracy = [1, 3, 6]  # Points when precision is calculated and logged
-        step_name = ["1 month prediction", "3 month prediction",
-                     "6 month prediction"]  # Points when precision is calculated and logged
+        # steps_to_measure_accuracy = [1, 3, 6]  # Points when precision is calculated and logged
+        # step_name = ["1 month prediction", "3 month prediction",
+        #              "6 month prediction"]  # Points when precision is calculated and logged
         number_of_predictions = 6  # How many months into the future the models should predict
         num_input_nodes = 12
 
     # Get data from files
     sales_records, fp_forecast_records = get_data(period, days_to_shift)
 
-    items_to_predict = ['7751']
-    # items_to_predict = list(sales_records.keys())
+    # items_to_predict = ['7751']
+    items_to_predict = list(sales_records.keys())
 
     nn_forecasts = {}
     fp_forecasts = {}
@@ -224,28 +224,28 @@ def run():
         fp_forecasts[item_id] = fp_forecasts_for_item
 
         # Neural network forecasts
-        # training_records, test_records = splitting.train_test_split(sales_records[item_id], prediction_cut_date)
-        # verify_training_records_are_sorted(training_records)  # Blows up if training records are not in date order
-        # training_data = [x.quantity for x in training_records]  # NN only cares about a list of numbers, not dates
-        #
-        # nn = NeuralNetwork(item_id, num_hidden_layers, num_hidden_nodes_per_layer, num_input_nodes)
-        # nn.train(training_data)
-        #
-        # init_values_to_predict = training_data[-nn.num_input_nodes:]  # The last x values of the training set
-        # nn_forecasts_for_item = nn_helper.get_forecasts_for_nn(item_id, nn, init_values_to_predict, test_records)
-        # nn_forecasts[item_id] = nn_forecasts_for_item
-        #
-        # num_item_models_trained += 1
-        # logging.info("Finished training a model. {0} out of {1} item models done"
-        #              .format(num_item_models_trained, len(items_to_predict)))
+        training_records, test_records = splitting.train_test_split(sales_records[item_id], prediction_cut_date)
+        verify_training_records_are_sorted(training_records)  # Blows up if training records are not in date order
+        training_data = [x.quantity for x in training_records]  # NN only cares about a list of numbers, not dates
 
-    log_errors(fp_forecasts, "AGR", steps_to_measure_accuracy, step_name)
-    # log_errors(nn_forecasts, "My NN", steps_to_measure_accuracy, step_name)
+        nn = NeuralNetwork(item_id, num_hidden_layers, num_hidden_nodes_per_layer, num_input_nodes)
+        nn.train(training_data)
+
+        init_values_to_predict = training_data[-nn.num_input_nodes:]  # The last x values of the training set
+        nn_forecasts_for_item = nn_helper.get_forecasts_for_nn(item_id, nn, init_values_to_predict, test_records)
+        nn_forecasts[item_id] = nn_forecasts_for_item
+
+        num_item_models_trained += 1
+        logging.info("Finished training a model. {0} out of {1} item models done"
+                     .format(num_item_models_trained, len(items_to_predict)))
+
+    log_errors(fp_forecasts, "AGR", number_of_predictions)
+    log_errors(nn_forecasts, "My NN", number_of_predictions)
 
     id_to_graph = items_to_predict[0]
     show_graph(sales_records[id_to_graph],
                [("FP", fp_forecasts[id_to_graph])
-                   # , ("NN", nn_forecasts[id_to_graph])
+                   , ("NN", nn_forecasts[id_to_graph])
                 ],
                id_to_graph,
                max_prediction_date)
@@ -265,3 +265,5 @@ def _is_training_data_sorted(training_data):
 
 
 run()
+# import os
+# print(os.environ['LD_LIBRARY_PATH'])

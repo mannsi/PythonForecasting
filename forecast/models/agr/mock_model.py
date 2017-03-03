@@ -19,7 +19,7 @@ class MockModel:
     def test(self):
         """
         Calculates the errors from the sales_and_prediction_list
-        :return: List[PredictionOutput]
+        :return: List[PredictionRecord]
         """
         if len(self.predictions) < self.number_of_predictions:
             raise Exception("Trying to make more predictions than there are records")
