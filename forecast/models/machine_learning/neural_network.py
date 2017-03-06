@@ -4,6 +4,7 @@ from typing import List
 from forecast.models.abstract_model import AbstractModel
 from keras.models import Sequential
 from keras.layers import Dense
+from keras.callbacks import EarlyStopping
 
 
 class NeuralNetwork(AbstractModel):
@@ -26,14 +27,17 @@ class NeuralNetwork(AbstractModel):
 
         train_x, train_y = self._create_training_dataset(training_data, self.num_input_nodes)
 
-        # create and fit Multilayer Perceptron neural_network_model
+        # create and fit MLP neural_network_model
 
         for i in range(self.num_hidden_layers):
             self.neural_network_model.add(
                 Dense(self.num_nodes_per_hidden_layer, input_dim=self.num_input_nodes, activation='relu'))
         self.neural_network_model.add(Dense(1))
         self.neural_network_model.compile(loss='mean_squared_error', optimizer='adam')
-        self.neural_network_model.fit(train_x, train_y, nb_epoch=500, batch_size=2, verbose=0)
+        # early_stopping = EarlyStopping(monitor='val_loss', patience=20, verbose=2, mode='auto')
+        # self.neural_network_model.fit(train_x, train_y, nb_epoch=500, batch_size=2, verbose=0, validation_split=0.1, callbacks=[early_stopping])
+        self.neural_network_model.fit(train_x, train_y, nb_epoch=500, batch_size=5, verbose=0)
+
         train_score = self.neural_network_model.evaluate(train_x, train_y, verbose=0)
         return math.sqrt(train_score)  # The train score is the mean squared error. Need to sqrt it to get the actual error.
 
