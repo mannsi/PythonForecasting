@@ -6,7 +6,7 @@ from keras.models import Sequential
 from keras.layers import Dense
 
 
-class nn_model(AbstractModel):
+class NeuralNetwork(AbstractModel):
     def __init__(self, item_id, num_hidden_layers: int, num_nodes_per_hidden_layer: int, num_input_nodes: int):
         """
 
@@ -33,7 +33,7 @@ class nn_model(AbstractModel):
                 Dense(self.num_nodes_per_hidden_layer, input_dim=self.num_input_nodes, activation='relu'))
         self.neural_network_model.add(Dense(1))
         self.neural_network_model.compile(loss='mean_squared_error', optimizer='adam')
-        self.neural_network_model.fit(train_x, train_y, nb_epoch=200, batch_size=2, verbose=0)
+        self.neural_network_model.fit(train_x, train_y, nb_epoch=500, batch_size=2, verbose=0)
         train_score = self.neural_network_model.evaluate(train_x, train_y, verbose=0)
         return math.sqrt(train_score)  # The train score is the mean squared error. Need to sqrt it to get the actual error.
 
@@ -43,7 +43,7 @@ class nn_model(AbstractModel):
 
         prediction_input = numpy.array([last_years_data])
         predicted_array = self.neural_network_model.predict(prediction_input)
-        return predicted_array[0]
+        return predicted_array[0][0]
 
     def _create_training_dataset(self, dataset, look_back):
         dataX, dataY = [], []
@@ -52,3 +52,15 @@ class nn_model(AbstractModel):
             dataX.append(a)
             dataY.append(dataset[i + look_back])
         return numpy.array(dataX), numpy.array(dataY)
+
+
+class NeuralNetworkConfig:
+    def __init__(self,
+                 description,
+                 num_hidden_layers,
+                 num_hidden_nodes_per_layer,
+                 num_input_nodes):
+        self.description = description
+        self.num_hidden_layers = num_hidden_layers
+        self.num_hidden_nodes_per_layer = num_hidden_nodes_per_layer
+        self.num_input_nodes = num_input_nodes

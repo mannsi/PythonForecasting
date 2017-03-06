@@ -5,7 +5,7 @@ import forecast.models.verification.error_calculations as error_calculations
 from forecast.data.structures import PredictionRecord, ItemDateQuantityRecord
 
 
-class fp_model:
+class FpModel:
     def __init__(self,
                  item_id: str,
                  sales_records: List[ItemDateQuantityRecord],
