@@ -29,3 +29,4 @@ def save_prediction_results(predictions: List[Dict[str, List[PredictionRecord]]]
         logging.info("=Average percentage error for period {period}: {error_val:.2f}% using model {model}"
                      .format(period=i+1, error_val=error, model=model_name))
 
+

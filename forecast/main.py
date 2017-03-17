@@ -36,16 +36,18 @@ def run():
 
     sales_records, fp_forecast_records = agr_data.data_from_files(period)
 
-    # item_ids_to_predict = ['7751']
-    item_ids_to_predict = list(sales_records.keys())
+    item_ids_to_predict = ['7751']
+    # item_ids_to_predict = list(sales_records.keys())
 
     # Forecast pro forecasts
     fp_forecasts = {}
+    fp_weighted_errors = {}
     for item_id in item_ids_to_predict:
         fp = FpModel(item_id, sales_records[item_id], fp_forecast_records[item_id], number_of_predictions)
         fp_forecasts_for_item = fp.test()
+        fp_weighted_errors[item_id] = error_calculations.get_errors_for_item(fp_forecasts_for_item)
         fp_forecasts[item_id] = fp_forecasts_for_item
-    save.save_prediction_results([fp_forecasts], "AGR", number_of_predictions)
+    # save.save_prediction_results([fp_forecasts], "AGR", number_of_predictions)
 
     # Neural Network forecasts
     # Constants
@@ -54,11 +56,12 @@ def run():
         # num_input_nodes = 52
     if period == 'M':
         # Values used by empirical paper
+        num_input_nodes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
         # num_input_nodes = [1, 2, 3, 4, 5]
-        # num_hidden_nodes = [0, 1, 3, 5, 7, 9]
+        num_hidden_nodes = [1, 3, 5, 7, 9]
 
-        num_input_nodes = [12]
-        num_hidden_nodes = [5]
+        # num_input_nodes = [12]
+        # num_hidden_nodes = [5]
 
         # num_input_nodes = 12
     else:
@@ -67,20 +70,64 @@ def run():
     prediction_cut_date = datetime.datetime(year=2016, month=2, day=1)  # The date FP predicted from (with shift)
 
     nn_configs = get_nn_configs(num_hidden_nodes, num_input_nodes)
+    nn_forecasts_for_all_items = {}
 
+    best_results_for_all_items = []
     for item_id in item_ids_to_predict:
+        nn_forecasts_for_all_items[item_id] = []
+        counter = 0
+        item_start_time = time.time()
         for nn_config in nn_configs:
+            counter += 1
+            config_start_time = time.time()
+
+            # Train the model
             training_records, test_records = splitting.train_test_split(sales_records[item_id], prediction_cut_date)
             training_data = [x.quantity for x in training_records]  # NN only cares about a list of numbers, not dates
             nn = NeuralNetwork(nn_config.num_hidden_layers, nn_config.num_hidden_nodes_per_layer, nn_config.num_input_nodes)
             nn.train(training_data)
 
+            # Get forecasts
             init_values_to_predict = training_data[-nn.num_input_nodes:]  # The last x values of the training set
             nn_forecasts_for_item = nn_helper.get_forecasts_for_nn(item_id, nn, init_values_to_predict, test_records)
+
+            # Sum up results and output to logs
             weighted_error, list_of_errors_by_month = error_calculations.get_errors_for_item(nn_forecasts_for_item)
+            result = ItemForecastResult()
+            result.item_id = item_id
+            result.hidden_nodes = nn_config.num_hidden_nodes_per_layer
+            result.input_nodes = nn_config.num_input_nodes
+            result.weighted_error = weighted_error
+            result.errors_per_month = list_of_errors_by_month
+            nn_forecasts_for_all_items[item_id].append(result)
+            if len(nn_configs) > 1:
+                t = int(time.time()-config_start_time)
+                logging.debug("Finished config setting nr {counter} out of {num_configs} for item {item}. Took {t} sec".
+                              format(counter=counter, item=item_id, num_configs=len(nn_configs), t=t))
+
+        results_for_item = nn_forecasts_for_all_items[item_id]
+        results_for_item.sort(key=lambda x: x.weighted_error)
+
+        best_result = results_for_item[0]
+        best_results_for_all_items.append(best_result)
+        logging.debug("Best result for item {iid} by weighted error:")
+        logging.debug("== WE:{we:.2f} HN:{hn}, IN:{inp}, ByMonth:({by_month})".
+                      format(we=best_result.weighted_error, hn=best_result.hidden_nodes, inp=best_result.input_nodes, by_month=','.join('{:.2f}'.format(x) for x in best_result.errors_per_month)))
+
+        logging.debug("Results in decreasing order")
+        for result in results_for_item:
+            t = int(time.time()-item_start_time)
+            logging.debug("Result for item {iid}: {we:.2f}. HN:{hn}, IN:{inp} .Took {time} seconds".
+                          format(iid=item_id, we=result.weighted_error, time=t, hn=result.hidden_nodes, inp=result.input_nodes))
+
+    for result in best_results_for_all_items:
+        logging.info("Summary over best results for each item")
+        logging.info("== Item:{iid}, NN_WE:{nn_we:.2f}, FP_WE: {fp_we:.2f}, HN:{hn}, IN:{inp}, ByMonth:({by_month})".
+                     format(iid=result.item_id, nn_we=result.weighted_error, fp_we=fp_weighted_errors[result.item_id][0], hn=result.hidden_nodes, inp=result.input_nodes,
+                            by_month=','.join('{:.2f}'.format(x) for x in result.errors_per_month)))
 
 
-    # for nn_config in nn_configs:
+        # for nn_config in nn_configs:
     #     logging.info("== Starting to run model '{description}'".format(description=nn_config.description))
     #     start_time = time.time()
     #
@@ -109,6 +156,16 @@ def run():
     #                                        ("NN", nn_forecasts[id_to_graph])
     #                                        ],
     #                                       id_to_graph)
+
+
+class ItemForecastResult:
+    def __init__(self):
+        self.item_id = ''
+        self.hidden_nodes = 0
+        self.input_nodes = 0
+        self.hidden_layers = 1
+        self.weighted_error = 0
+        self.errors_per_month = []
 
 
 def get_nn_configs(num_hidden_nodes, num_input_nodes):
