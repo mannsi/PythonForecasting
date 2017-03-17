@@ -36,8 +36,10 @@ def run():
 
     sales_records, fp_forecast_records = agr_data.data_from_files(period)
 
-    item_ids_to_predict = ['7751']
+    # item_ids_to_predict = ['7751']
     # item_ids_to_predict = list(sales_records.keys())
+    num_items_to_predict = 2
+    item_ids_to_predict = list(sales_records.keys())[:num_items_to_predict]
 
     # Forecast pro forecasts
     fp_forecasts = {}
@@ -114,11 +116,11 @@ def run():
         logging.debug("== WE:{we:.2f} HN:{hn}, IN:{inp}, ByMonth:({by_month})".
                       format(we=best_result.weighted_error, hn=best_result.hidden_nodes, inp=best_result.input_nodes, by_month=','.join('{:.2f}'.format(x) for x in best_result.errors_per_month)))
 
-        logging.debug("Results in decreasing order")
+        t = int(time.time() - item_start_time)
+        logging.debug("Results for {iid} in decreasing order. Took {t} seconds".format(iid=item_id, t=t))
         for result in results_for_item:
-            t = int(time.time()-item_start_time)
-            logging.debug("Result for item {iid}: {we:.2f}. HN:{hn}, IN:{inp} .Took {time} seconds".
-                          format(iid=item_id, we=result.weighted_error, time=t, hn=result.hidden_nodes, inp=result.input_nodes))
+            logging.debug("We:{we:.2f}. HN:{hn}, IN:{inp}".
+                          format(we=result.weighted_error, hn=result.hidden_nodes, inp=result.input_nodes))
 
     for result in best_results_for_all_items:
         logging.info("Summary over best results for each item")
