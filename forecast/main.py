@@ -17,8 +17,8 @@ import forecast.models.verification.error_calculations as error_calculations
 
 def run():
     # fix random seed for reproducibility
-    # seed = 7
-    # numpy.random.seed(seed)
+    seed = 7
+    numpy.random.seed(seed)
 
     forecast_log.init_file_and_console_logging(
         console_log_level=logging.DEBUG,
@@ -122,9 +122,9 @@ def run():
             logging.debug("We:{we:.2f}. HN:{hn}, IN:{inp}".
                           format(we=result.weighted_error, hn=result.hidden_nodes, inp=result.input_nodes))
 
+    logging.warning("Summary over best results for each item")
     for result in best_results_for_all_items:
-        logging.info("Summary over best results for each item")
-        logging.info("== Item:{iid}, NN_WE:{nn_we:.2f}, FP_WE: {fp_we:.2f}, HN:{hn}, IN:{inp}, ByMonth:({by_month})".
+        logging.warning("== Item:{iid}, NN_WE:{nn_we:.2f}, FP_WE: {fp_we:.2f}, HN:{hn}, IN:{inp}, ByMonth:({by_month})".
                      format(iid=result.item_id, nn_we=result.weighted_error, fp_we=fp_weighted_errors[result.item_id][0], hn=result.hidden_nodes, inp=result.input_nodes,
                             by_month=','.join('{:.2f}'.format(x) for x in result.errors_per_month)))
 
