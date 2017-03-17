@@ -61,3 +61,15 @@ def percentage_error(value, predicted_value):
     if value == 0:
         return None
     return float(100 * math.fabs(value-predicted_value)) / value
+
+
+def get_errors_for_item(nn_forecasts_for_item: List[PredictionRecord]):
+    """
+
+    :param nn_forecasts_for_item: list of prediction records for a single item
+    :return: Weighted_error, list_of_errors_per_month
+    """
+    list_of_errors_per_month = [x.error for x in nn_forecasts_for_item]
+    weighted_average_error = weighted_average(list_of_errors_per_month)
+
+    return weighted_average_error, list_of_errors_per_month

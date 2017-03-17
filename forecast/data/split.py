@@ -2,6 +2,7 @@ import datetime
 from typing import List
 
 from forecast.data.structures import ItemDateQuantityRecord
+import forecast.data.verification as verification
 
 
 def train_test_split(sales_prediction_records: List[ItemDateQuantityRecord], date_split: datetime):
@@ -14,6 +15,8 @@ def train_test_split(sales_prediction_records: List[ItemDateQuantityRecord], dat
 
     train_data = [x for x in sales_prediction_records if x.date < date_split]
     test_data = [x for x in sales_prediction_records if date_split < x.date]
+
+    verification.verify_training_records_are_sorted(train_data)  # Blows up if training records are not in date order
 
     return train_data, test_data
 
