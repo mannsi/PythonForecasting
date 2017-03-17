@@ -14,8 +14,11 @@ from forecast.models.machine_learning.neural_network import NeuralNetworkConfig
 from forecast.models.machine_learning.neural_network import NeuralNetwork
 import forecast.models.verification.error_calculations as error_calculations
 
+import tracemalloc
 
 def run():
+    tracemalloc.start()
+
     # fix random seed for reproducibility
     seed = 7
     numpy.random.seed(seed)
@@ -128,35 +131,13 @@ def run():
                           format(we=result.weighted_error, hn=result.hidden_nodes, inp=result.input_nodes))
         logging.debug(
             "Finished processing item {ic} out of {total}".format(ic=item_counter, total=len(item_ids_to_predict)))
-            # for nn_config in nn_configs:
-            #     logging.info("== Starting to run model '{description}'".format(description=nn_config.description))
-            #     start_time = time.time()
-            #
-            #     nn_forecasts_list = []
-            #
-            #
-            #
-            #     for i in range(10):  # This is done because of random start weights
-            #         iteration_start_time = time.time()
-            #         nn_forecasts = nn_helper.run_and_predict_nn(
-            #             prediction_cut_date,
-            #             item_ids_to_predict,
-            #             sales_records,
-            #             nn_config.num_hidden_layers,
-            #             nn_config.num_hidden_nodes_per_layer,
-            #             nn_config.num_input_nodes)
-            #         nn_forecasts_list.append(nn_forecasts)
-            #         logging.debug("Finished iteration {iteration} of model. Time was {t:.1f} seconds".format(iteration=i+1, t=time.time()-iteration_start_time))
-            #     save.save_prediction_results(nn_forecasts_list, nn_config.description, number_of_predictions)
-            #     logging.info("== Finished processing model. Time was {t:.1f} seconds".format(t=time.time()-start_time))
 
-            # if should_graph:
-            #     id_to_graph = item_ids_to_predict[0]
-            #     graph_wrapper.show_quantity_graph(sales_records[id_to_graph],
-            #                                       [("FP", fp_forecasts[id_to_graph]),
-            #                                        ("NN", nn_forecasts[id_to_graph])
-            #                                        ],
-            #                                       id_to_graph)
+        snapshot = tracemalloc.take_snapshot()
+        top_stats = snapshot.statistics('lineno')
+
+        print("[ Top 10 ]")
+        for stat in top_stats[:10]:
+            print(stat)
 
 
 class ItemForecastResult:
@@ -167,6 +148,8 @@ class ItemForecastResult:
         self.hidden_layers = 1
         self.weighted_error = 0
         self.errors_per_month = []
+
+
 
 
 def get_nn_configs(num_hidden_nodes, num_input_nodes):
