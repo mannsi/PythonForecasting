@@ -6,6 +6,7 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.callbacks import EarlyStopping
 from keras import backend as K
+from keras import optimizers
 
 
 class NeuralNetwork(AbstractModel):
@@ -33,9 +34,13 @@ class NeuralNetwork(AbstractModel):
             self.neural_network_model.add(
                 Dense(self.num_nodes_per_hidden_layer, input_dim=self.num_input_nodes, activation='relu'))
         self.neural_network_model.add(Dense(1))
-        self.neural_network_model.compile(loss='mean_squared_error', optimizer='adam')
+
+        sgd = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+        self.neural_network_model.compile(loss='mean_squared_error', optimizer=sgd)
         # early_stopping = EarlyStopping(monitor='val_loss', patience=20, verbose=2, mode='auto')
         # self.neural_network_model.fit(train_x, train_y, nb_epoch=500, batch_size=1, verbose=0, validation_split=0.1, callbacks=[early_stopping])
+
+
         self.neural_network_model.fit(train_x, train_y, nb_epoch=500, batch_size=10, verbose=0)
 
         train_score = self.neural_network_model.evaluate(train_x, train_y, verbose=0)

@@ -37,9 +37,9 @@ def run():
     sales_records, fp_forecast_records = agr_data.data_from_files(period)
 
     # item_ids_to_predict = ['7751']
-    # item_ids_to_predict = list(sales_records.keys())
-    num_items_to_predict = 2
-    item_ids_to_predict = list(sales_records.keys())[:num_items_to_predict]
+    item_ids_to_predict = list(sales_records.keys())
+    # num_items_to_predict = 10
+    # item_ids_to_predict = list(sales_records.keys())[:num_items_to_predict]
 
     # Forecast pro forecasts
     fp_forecasts = {}
@@ -72,11 +72,10 @@ def run():
     prediction_cut_date = datetime.datetime(year=2016, month=2, day=1)  # The date FP predicted from (with shift)
 
     nn_configs = get_nn_configs(num_hidden_nodes, num_input_nodes)
-    nn_forecasts_for_all_items = {}
 
-    best_results_for_all_items = []
+    item_counter = 0
     for item_id in item_ids_to_predict:
-        nn_forecasts_for_all_items[item_id] = []
+        results_for_item = []
         counter = 0
         item_start_time = time.time()
         for nn_config in nn_configs:
@@ -86,14 +85,15 @@ def run():
             # Train the model
             training_records, test_records = splitting.train_test_split(sales_records[item_id], prediction_cut_date)
             training_data = [x.quantity for x in training_records]  # NN only cares about a list of numbers, not dates
-            nn = NeuralNetwork(nn_config.num_hidden_layers, nn_config.num_hidden_nodes_per_layer, nn_config.num_input_nodes)
+            nn = NeuralNetwork(nn_config.num_hidden_layers, nn_config.num_hidden_nodes_per_layer,
+                               nn_config.num_input_nodes)
             nn.train(training_data)
 
             # Get forecasts
             init_values_to_predict = training_data[-nn.num_input_nodes:]  # The last x values of the training set
             nn_forecasts_for_item = nn_helper.get_forecasts_for_nn(item_id, nn, init_values_to_predict, test_records)
 
-            # Sum up results and output to logs
+            # Sum up results
             weighted_error, list_of_errors_by_month = error_calculations.get_errors_for_item(nn_forecasts_for_item)
             result = ItemForecastResult()
             result.item_id = item_id
@@ -101,63 +101,62 @@ def run():
             result.input_nodes = nn_config.num_input_nodes
             result.weighted_error = weighted_error
             result.errors_per_month = list_of_errors_by_month
-            nn_forecasts_for_all_items[item_id].append(result)
+
+            results_for_item.append(result)
             if len(nn_configs) > 1:
-                t = int(time.time()-config_start_time)
+                t = int(time.time() - config_start_time)
                 logging.debug("Finished config setting nr {counter} out of {num_configs} for item {item}. Took {t} sec".
                               format(counter=counter, item=item_id, num_configs=len(nn_configs), t=t))
 
-        results_for_item = nn_forecasts_for_all_items[item_id]
         results_for_item.sort(key=lambda x: x.weighted_error)
 
         best_result = results_for_item[0]
-        best_results_for_all_items.append(best_result)
         logging.debug("Best result for item {iid} by weighted error:")
-        logging.debug("== WE:{we:.2f} HN:{hn}, IN:{inp}, ByMonth:({by_month})".
-                      format(we=best_result.weighted_error, hn=best_result.hidden_nodes, inp=best_result.input_nodes, by_month=','.join('{:.2f}'.format(x) for x in best_result.errors_per_month)))
+        logging.warning(
+            "== Result for {iid}. Best WE:{we:.2f}, FP_WE: {fp_we:.2f},  HN:{hn}, IN:{inp}, ByMonth:({by_month})".
+            format(we=best_result.weighted_error,
+                   hn=best_result.hidden_nodes,
+                   inp=best_result.input_nodes,
+                   iid=item_id,
+                   fp_we=fp_weighted_errors[best_result.item_id][0],
+                   by_month=','.join('{:.2f}'.format(x) for x in best_result.errors_per_month)))
 
         t = int(time.time() - item_start_time)
         logging.debug("Results for {iid} in decreasing order. Took {t} seconds".format(iid=item_id, t=t))
         for result in results_for_item:
             logging.debug("We:{we:.2f}. HN:{hn}, IN:{inp}".
                           format(we=result.weighted_error, hn=result.hidden_nodes, inp=result.input_nodes))
+        logging.debug(
+            "Finished processing item {ic} out of {total}".format(ic=item_counter, total=len(item_ids_to_predict)))
+            # for nn_config in nn_configs:
+            #     logging.info("== Starting to run model '{description}'".format(description=nn_config.description))
+            #     start_time = time.time()
+            #
+            #     nn_forecasts_list = []
+            #
+            #
+            #
+            #     for i in range(10):  # This is done because of random start weights
+            #         iteration_start_time = time.time()
+            #         nn_forecasts = nn_helper.run_and_predict_nn(
+            #             prediction_cut_date,
+            #             item_ids_to_predict,
+            #             sales_records,
+            #             nn_config.num_hidden_layers,
+            #             nn_config.num_hidden_nodes_per_layer,
+            #             nn_config.num_input_nodes)
+            #         nn_forecasts_list.append(nn_forecasts)
+            #         logging.debug("Finished iteration {iteration} of model. Time was {t:.1f} seconds".format(iteration=i+1, t=time.time()-iteration_start_time))
+            #     save.save_prediction_results(nn_forecasts_list, nn_config.description, number_of_predictions)
+            #     logging.info("== Finished processing model. Time was {t:.1f} seconds".format(t=time.time()-start_time))
 
-    logging.warning("Summary over best results for each item")
-    for result in best_results_for_all_items:
-        logging.warning("== Item:{iid}, NN_WE:{nn_we:.2f}, FP_WE: {fp_we:.2f}, HN:{hn}, IN:{inp}, ByMonth:({by_month})".
-                     format(iid=result.item_id, nn_we=result.weighted_error, fp_we=fp_weighted_errors[result.item_id][0], hn=result.hidden_nodes, inp=result.input_nodes,
-                            by_month=','.join('{:.2f}'.format(x) for x in result.errors_per_month)))
-
-
-        # for nn_config in nn_configs:
-    #     logging.info("== Starting to run model '{description}'".format(description=nn_config.description))
-    #     start_time = time.time()
-    #
-    #     nn_forecasts_list = []
-    #
-    #
-    #
-    #     for i in range(10):  # This is done because of random start weights
-    #         iteration_start_time = time.time()
-    #         nn_forecasts = nn_helper.run_and_predict_nn(
-    #             prediction_cut_date,
-    #             item_ids_to_predict,
-    #             sales_records,
-    #             nn_config.num_hidden_layers,
-    #             nn_config.num_hidden_nodes_per_layer,
-    #             nn_config.num_input_nodes)
-    #         nn_forecasts_list.append(nn_forecasts)
-    #         logging.debug("Finished iteration {iteration} of model. Time was {t:.1f} seconds".format(iteration=i+1, t=time.time()-iteration_start_time))
-    #     save.save_prediction_results(nn_forecasts_list, nn_config.description, number_of_predictions)
-    #     logging.info("== Finished processing model. Time was {t:.1f} seconds".format(t=time.time()-start_time))
-
-    # if should_graph:
-    #     id_to_graph = item_ids_to_predict[0]
-    #     graph_wrapper.show_quantity_graph(sales_records[id_to_graph],
-    #                                       [("FP", fp_forecasts[id_to_graph]),
-    #                                        ("NN", nn_forecasts[id_to_graph])
-    #                                        ],
-    #                                       id_to_graph)
+            # if should_graph:
+            #     id_to_graph = item_ids_to_predict[0]
+            #     graph_wrapper.show_quantity_graph(sales_records[id_to_graph],
+            #                                       [("FP", fp_forecasts[id_to_graph]),
+            #                                        ("NN", nn_forecasts[id_to_graph])
+            #                                        ],
+            #                                       id_to_graph)
 
 
 class ItemForecastResult:
@@ -186,7 +185,6 @@ def get_nn_configs(num_hidden_nodes, num_input_nodes):
                 hidden_nodes,
                 input_nodes))
     return nn_configs
-
 
 
 run()
