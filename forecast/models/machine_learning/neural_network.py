@@ -35,8 +35,7 @@ class NeuralNetwork(AbstractModel):
                 Dense(self.num_nodes_per_hidden_layer, input_dim=self.num_input_nodes, activation='relu'))
         self.neural_network_model.add(Dense(1))
 
-        sgd = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-        self.neural_network_model.compile(loss='mean_squared_error', optimizer=sgd)
+        self.neural_network_model.compile(loss='mean_squared_error', optimizer='adam')
         # early_stopping = EarlyStopping(monitor='val_loss', patience=20, verbose=2, mode='auto')
         # self.neural_network_model.fit(train_x, train_y, nb_epoch=500, batch_size=1, verbose=0, validation_split=0.1, callbacks=[early_stopping])
 
@@ -52,7 +51,12 @@ class NeuralNetwork(AbstractModel):
 
         prediction_input = numpy.array([last_years_data])
         predicted_array = self.neural_network_model.predict(prediction_input)
-        return predicted_array[0][0]
+        output_prediction = predicted_array[0][0]
+        #
+        # import math
+        # if math.isnan(output_prediction):
+        #     a = 5
+        return output_prediction
 
     def _create_training_dataset(self, dataset, look_back):
         dataX, dataY = [], []

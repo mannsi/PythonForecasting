@@ -10,7 +10,9 @@ import forecast.data.group as group
 from forecast.data.structures import ItemDateQuantityRecord
 
 
-def data_from_files(period):
+def data_from_files():
+    period = 'M'
+
     # Get the data from files and clean it
     fp_prediction_date = datetime.datetime(year=2016, month=2, day=6)  # The date FP predicted from
     days_to_shift = -fp_prediction_date.day  # Shift by these days so predictions start from the 1. of the month

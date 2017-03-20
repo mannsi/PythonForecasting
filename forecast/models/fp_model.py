@@ -16,7 +16,7 @@ class FpModel:
         self.item_id = item_id
         self.predictions = self._create_forecasts(sales_records, forecast_pro_forecast_records)
 
-    def test(self):
+    def get_predictions(self):
         """
         Calculates the errors from the sales_and_prediction_list
         :return: List[PredictionRecord]

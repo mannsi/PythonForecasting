@@ -8,6 +8,7 @@ def get_forecasts_for_nn(item_id, nn, values_used_to_predict, test_records):
     for i in range(len(test_records)):
         test_record_being_predicted = test_records[i]
         predicted_quantity = nn.predict(values_used_to_predict)
+
         date = test_record_being_predicted.date
 
         percentage_error = error_calculations.percentage_error(test_record_being_predicted.quantity,
