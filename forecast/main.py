@@ -15,7 +15,7 @@ from forecast.models.machine_learning.neural_network import NeuralNetwork
 import forecast.models.verification.error_calculations as error_calculations
 
 
-def run(item_num_to_predict):
+def run():
     # logging.warning("RUN DESCRIPTION")
     # fix random seed for reproducibility
     seed = 7
@@ -108,9 +108,4 @@ if __name__ == "__main__":
         console_log_level=logging.DEBUG,
         details_file_name="logging_details.txt",
         summary_file_name="logging_summary.txt")
-
-    if len(sys.argv) == 2:
-        item_num_to_predict = int(sys.argv[1])
-        run(item_num_to_predict)
-    else:
-        run(None)
+    run()
