@@ -7,21 +7,23 @@ from keras.layers import Dense
 from keras.callbacks import EarlyStopping
 from keras import backend as K
 from keras import optimizers
+import tensorflow as tf
 
 
 class NeuralNetwork(AbstractModel):
-    def __init__(self, num_hidden_layers: int, num_nodes_per_hidden_layer: int, num_input_nodes: int):
+    def __init__(self, num_nodes_per_hidden_layer: int, num_input_nodes: int):
         """
 
         :param data_periods:
         """
         self.neural_network_model = Sequential()
         self.num_nodes_per_hidden_layer = num_nodes_per_hidden_layer
-        self.num_hidden_layers = num_hidden_layers
         self.num_input_nodes = num_input_nodes
 
     def train(self, training_data: List[float]):
         K.clear_session()
+        tf.reset_default_graph()
+
         if len(training_data) < self.num_input_nodes:
             raise Exception("Not enough training data records to train. Need {need} but got {got}"
                             .format(need=self.num_input_nodes, got=len(training_data)))
@@ -29,16 +31,12 @@ class NeuralNetwork(AbstractModel):
         train_x, train_y = self._create_training_dataset(training_data, self.num_input_nodes)
 
         # create and fit MLP neural_network_model
-
-        for i in range(self.num_hidden_layers):
-            self.neural_network_model.add(
-                Dense(self.num_nodes_per_hidden_layer, input_dim=self.num_input_nodes, activation='relu'))
+        self.neural_network_model.add(Dense(self.num_nodes_per_hidden_layer, input_dim=self.num_input_nodes, activation='relu'))
         self.neural_network_model.add(Dense(1))
 
         self.neural_network_model.compile(loss='mean_squared_error', optimizer='adam')
         # early_stopping = EarlyStopping(monitor='val_loss', patience=20, verbose=2, mode='auto')
         # self.neural_network_model.fit(train_x, train_y, nb_epoch=500, batch_size=1, verbose=0, validation_split=0.1, callbacks=[early_stopping])
-
 
         self.neural_network_model.fit(train_x, train_y, nb_epoch=500, batch_size=10, verbose=0)
 
@@ -74,6 +72,5 @@ class NeuralNetworkConfig:
                  num_hidden_nodes_per_layer,
                  num_input_nodes):
         self.description = description
-        self.num_hidden_layers = num_hidden_layers
         self.num_hidden_nodes_per_layer = num_hidden_nodes_per_layer
         self.num_input_nodes = num_input_nodes

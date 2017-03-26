@@ -23,13 +23,8 @@ def run(item_num_to_predict):
 
     sales_records, fp_forecast_records = agr_data.data_from_files()
 
-    if item_num_to_predict is None:
-        item_ids_to_predict = ['24585']
-    else:
-        item_ids_to_predict = list(sales_records.keys())
-        item_ids_to_predict.sort()
-        i = item_num_to_predict
-        item_ids_to_predict = item_ids_to_predict[i-1:i]
+    item_ids_to_predict = list(sales_records.keys())
+    # item_ids_to_predict = ['24585']
 
     # Forecast pro forecasts
     fp_weighted_errors = {}
@@ -39,8 +34,14 @@ def run(item_num_to_predict):
         fp_weighted_errors[item_id] = error_calculations.get_errors_for_item(fp_forecasts_for_item)
 
     # Neural Network forecasts
-    num_input_nodes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    num_hidden_nodes = [3, 5, 7, 9, 11]
+
+    # Nodes from initial trial run
+    # num_input_nodes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    # num_hidden_nodes = [3, 5, 7, 9, 11]
+
+    # Nodes after seeing the best combinations from the initial trial run
+    num_input_nodes = [12, 13, 14, 15]
+    num_hidden_nodes = [9, 11]
     prediction_cut_date = datetime.datetime(year=2016, month=2, day=1)  # The date FP predicted from (with shift)
     num_times_to_train_each_nn = 10
     nn_configs = get_nn_configs(num_hidden_nodes, num_input_nodes)
@@ -60,7 +61,7 @@ def run(item_num_to_predict):
             training_data = [x.quantity for x in training_records]  # NN only cares about a list of numbers, not dates
             training_error_sum = 0
             for i in range(num_times_to_train_each_nn):
-                nn = NeuralNetwork(nn_config.num_hidden_layers, nn_config.num_hidden_nodes_per_layer, nn_config.num_input_nodes)
+                nn = NeuralNetwork(nn_config.num_hidden_nodes_per_layer, nn_config.num_input_nodes)
                 training_error_sum += numpy.sqrt(nn.train(training_data))
             training_error = float(training_error_sum) / num_times_to_train_each_nn
 
@@ -88,19 +89,16 @@ def run(item_num_to_predict):
         logging.debug("Finished processing item {ic} out of {total}. Took {t} seconds"
                       .format(ic=item_counter, total=len(item_ids_to_predict), t=time_for_item))
 
+
 def get_nn_configs(num_hidden_nodes, num_input_nodes):
     nn_configs = []
     for input_nodes in num_input_nodes:
         for hidden_nodes in num_hidden_nodes:
-            hidden_layers = 1 if input_nodes > 0 else 0
 
-            description = "NN. Hidden layers: {hl}, hidden nodes: {hn}, input nodes: {inp}".format(hl=hidden_layers,
-                                                                                                   hn=hidden_nodes,
-                                                                                                   inp=input_nodes)
+            description = "NN.hidden nodes: {hn}, input nodes: {inp}".format(hn=hidden_nodes, inp=input_nodes)
 
             nn_configs.append(NeuralNetworkConfig(
                 description,
-                hidden_layers,
                 hidden_nodes,
                 input_nodes))
     return nn_configs
