@@ -2,7 +2,7 @@ import csv
 
 # Processes the results_logger.txt output file
 
-input_file = 'results_logger_best.txt'
+input_file = 'results_logger_diff_best_values.txt'
 
 fp_we_values = []
 nn_we_values = []
@@ -10,7 +10,7 @@ hn_values = []
 inp_values = []
 
 with open(input_file,'r') as f:
-    next(f) # skip headings
+    # next(f) # skip headings
     line = csv.reader(f,delimiter='\t')
     for item_id,FP_WE, NN_WE, HN, INP, NN_M1, NN_M2, NN_M3, NN_M4, NN_M5, NN_M6 in line:
         fp_we_values.append(float(FP_WE))

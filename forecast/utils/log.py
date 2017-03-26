@@ -1,5 +1,6 @@
 import logging
 
+results_logger_name = "results_logger"
 
 def init_file_and_console_logging(console_log_level, details_file_name, summary_file_name):
     log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -21,9 +22,9 @@ def init_file_and_console_logging(console_log_level, details_file_name, summary_
     console_handler.setLevel(console_log_level)
     root_logger.addHandler(console_handler)
 
-    results_logger = logging.getLogger("results_logger")
+    results_logger = logging.getLogger(results_logger_name)
     results_logger.setLevel(logging.INFO)
-    results_logger_handler = logging.FileHandler("results_logger.txt")
+    results_logger_handler = logging.FileHandler("results_logger_diff_best_values.txt")
     results_logger_handler.setFormatter(logging.Formatter("%(message)s"))
     results_logger_handler.setLevel(logging.INFO)
     results_logger.addHandler(results_logger_handler)
@@ -48,7 +49,7 @@ def log_best_result_for_item(best_result, fp_weighted_errors, item_id):
                    fp_we=fp_weighted_errors[best_result.item_id][0],
                    by_month=','.join('{:.2f}'.format(x) for x in best_result.errors_per_month)))
 
-    results_logger = logging.getLogger("results_logger")
+    results_logger = logging.getLogger(results_logger_name)
     results_logger.log(logging.INFO, "{iid}\t{fp_we:.2f}\t{NN_we:.2f}\t{hn}\t{inp}\t{NN_M1:.2f}\t{NN_M2:.2f}\t {NN_M3:.2f}\t {NN_M4:.2f}\t {NN_M5:.2f}\t {NN_M6:.2f}"
                        .format(fp_we=fp_weighted_errors[best_result.item_id][0],
                                NN_we=best_result.weighted_error,

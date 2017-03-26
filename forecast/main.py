@@ -8,11 +8,12 @@ import forecast.data.agr as agr_data
 import forecast.models.machine_learning.neural_network_wrapper as nn_helper
 import forecast.utils.log as forecast_log
 import forecast.data.split as splitting
+import forecast.models.verification.error_calculations as error_calculations
+import forecast.data.preprocessing as preprocessing
 from forecast.data.structures import ItemForecastResult
 from forecast.models.fp_model import FpModel
 from forecast.models.machine_learning.neural_network import NeuralNetworkConfig
 from forecast.models.machine_learning.neural_network import NeuralNetwork
-import forecast.models.verification.error_calculations as error_calculations
 
 
 def run():
@@ -45,6 +46,7 @@ def run():
     prediction_cut_date = datetime.datetime(year=2016, month=2, day=1)  # The date FP predicted from (with shift)
     num_times_to_train_each_nn = 10
     nn_configs = get_nn_configs(num_hidden_nodes, num_input_nodes)
+    preprocessing_method = 'DIFF'
 
     item_counter = 0
     for item_id in item_ids_to_predict:
@@ -57,7 +59,14 @@ def run():
             config_start_time = time.time()
 
             # Train the model
-            training_data, test_data = splitting.train_test_split(sales_records[item_id], prediction_cut_date)
+            training_data, testing_data = splitting.train_test_split(sales_records[item_id], prediction_cut_date)
+
+            if preprocessing_method == 'MA':
+                training_data, testing_data = preprocessing.moving_average(training_data, testing_data)
+            elif preprocessing_method == 'DIFF':
+                last_training_value = training_data[-1]  # Used with diff prediction to get actual predicted value
+                training_data, testing_data = preprocessing.diff(training_data, testing_data)
+
             training_error_sum = 0
             for i in range(num_times_to_train_each_nn):
                 nn = NeuralNetwork(nn_config.num_hidden_nodes_per_layer, nn_config.num_input_nodes)
@@ -66,7 +75,12 @@ def run():
 
             # Get forecasts
             init_values_to_predict = training_data[-nn.num_input_nodes:]  # The last x values of the training set
-            nn_forecasts_for_item = nn_helper.get_forecasts_for_nn(item_id, nn, init_values_to_predict, test_data)
+            if preprocessing_method == 'DIFF':
+                nn_forecasts_for_item = nn_helper.get_forecasts_for_nn_with_diff(item_id, nn, init_values_to_predict,
+                                                                                 last_training_value, testing_data)
+            else:
+                nn_forecasts_for_item = nn_helper.get_forecasts_for_nn(item_id, nn, init_values_to_predict,
+                                                                       testing_data)
 
             # Sum up results
             weighted_error, list_of_errors_by_month = error_calculations.get_errors_for_item(nn_forecasts_for_item)
