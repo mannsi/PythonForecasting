@@ -68,7 +68,6 @@ class NeuralNetwork(AbstractModel):
 class NeuralNetworkConfig:
     def __init__(self,
                  description,
-                 num_hidden_layers,
                  num_hidden_nodes_per_layer,
                  num_input_nodes):
         self.description = description

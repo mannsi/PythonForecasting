@@ -2,19 +2,16 @@ import forecast.models.verification.error_calculations as error_calculations
 from forecast.data.structures import PredictionRecord
 
 
-def get_forecasts_for_nn(item_id, nn, values_used_to_predict, test_records):
+def get_forecasts_for_nn(item_id, nn, values_used_to_predict, test_data):
     nn_forecasts = []
 
-    for i in range(len(test_records)):
-        test_record_being_predicted = test_records[i]
+    for i in range(len(test_data)):
+        true_value = test_data[i]
         predicted_quantity = nn.predict(values_used_to_predict)
 
-        date = test_record_being_predicted.date
-
-        percentage_error = error_calculations.percentage_error(test_record_being_predicted.quantity,
+        percentage_error = error_calculations.percentage_error(true_value,
                                                                predicted_quantity)
-        sales_qty = test_record_being_predicted.quantity
-        nn_forecasts.append(PredictionRecord(item_id, date, sales_qty, predicted_quantity, percentage_error))
+        nn_forecasts.append(PredictionRecord(item_id, '', true_value, predicted_quantity, percentage_error))
 
         # Add the newest predicted value to the list and remove the first one.
         # We continue by predicting using the already predicted values as truth

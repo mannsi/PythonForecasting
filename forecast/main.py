@@ -57,8 +57,7 @@ def run(item_num_to_predict):
             config_start_time = time.time()
 
             # Train the model
-            training_records, test_records = splitting.train_test_split(sales_records[item_id], prediction_cut_date)
-            training_data = [x.quantity for x in training_records]  # NN only cares about a list of numbers, not dates
+            training_data, test_data = splitting.train_test_split(sales_records[item_id], prediction_cut_date)
             training_error_sum = 0
             for i in range(num_times_to_train_each_nn):
                 nn = NeuralNetwork(nn_config.num_hidden_nodes_per_layer, nn_config.num_input_nodes)
@@ -67,7 +66,7 @@ def run(item_num_to_predict):
 
             # Get forecasts
             init_values_to_predict = training_data[-nn.num_input_nodes:]  # The last x values of the training set
-            nn_forecasts_for_item = nn_helper.get_forecasts_for_nn(item_id, nn, init_values_to_predict, test_records)
+            nn_forecasts_for_item = nn_helper.get_forecasts_for_nn(item_id, nn, init_values_to_predict, test_data)
 
             # Sum up results
             weighted_error, list_of_errors_by_month = error_calculations.get_errors_for_item(nn_forecasts_for_item)
